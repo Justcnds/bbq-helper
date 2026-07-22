@@ -1315,20 +1315,16 @@ window.renderModifyDishesGrid = function(filterQuery = '') {
         filtered.forEach(dish => {
             const qty = editingOrderItems[dish.name] || 0;
             const priceVal = typeof dish.price === 'number' ? dish.price : 0;
-            const catName = dishCategoryMap[dish.name] || '烧烤';
             
             const card = document.createElement('div');
             card.className = 'dish-counter-card' + (qty > 0 ? ' active' : '');
             card.innerHTML = `
-                <div class="dish-card-header">
-                    <span class="dish-cat-badge">${catName}</span>
-                    <span class="dish-card-price">￥${priceVal.toFixed(1)}</span>
-                </div>
-                <div class="dish-card-name">${dish.name}</div>
-                <div class="dish-card-controls">
-                    <button type="button" class="btn-dish-qty btn-minus" onclick="changeModifyDishQty('${dish.name}', -1)">-</button>
+                <span class="dish-counter-name">${dish.name}</span>
+                <span class="dish-counter-price">￥${priceVal.toFixed(1)}元</span>
+                <div class="dish-counter-controls">
+                    <button type="button" class="btn-qty btn-qty-minus ${qty === 0 ? 'disabled' : ''}" onclick="changeModifyDishQty('${dish.name}', -1)">-</button>
                     <span class="dish-qty-val">${qty}</span>
-                    <button type="button" class="btn-dish-qty btn-plus" onclick="changeModifyDishQty('${dish.name}', 1)">+</button>
+                    <button type="button" class="btn-qty btn-qty-plus" onclick="changeModifyDishQty('${dish.name}', 1)">+</button>
                 </div>
             `;
             container.appendChild(card);
