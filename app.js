@@ -917,11 +917,7 @@ function renderSettingsEditor() {
             item.className = 'tag-edit-item';
             item.style.cursor = 'pointer';
             item.title = '点击修改名称或价格';
-            item.onclick = (e) => {
-                // 如果点击的是删除按钮 ✕，不触发弹窗
-                if (e.target.classList.contains('btn-remove')) return;
-                openEditDishModal(idx);
-            };
+            item.setAttribute('onclick', `window.openEditDishModal(${idx})`);
             const priceVal = typeof dish.price === 'number' ? dish.price : 0;
             item.innerHTML = `
                 <span>✏️ ${dish.name} (￥${priceVal.toFixed(1)}元)</span>
@@ -1959,7 +1955,7 @@ function renderAllHistoryRecords() {
 // --- 菜品编辑与重置功能 ---
 let editingDishIndex = -1;
 
-window.openEditDishModal = function(idx) {
+function openEditDishModal(idx) {
     if (idx < 0 || idx >= state.dishes.length) return;
     editingDishIndex = idx;
     const dish = state.dishes[idx];
@@ -1970,16 +1966,21 @@ window.openEditDishModal = function(idx) {
     if (priceInput) priceInput.value = dish.price;
     
     const modal = document.getElementById('edit-dish-modal');
-    if (modal) modal.style.display = 'flex';
-};
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.zIndex = '999999';
+    }
+}
+window.openEditDishModal = openEditDishModal;
 
-window.closeEditDishModal = function() {
+function closeEditDishModal() {
     const modal = document.getElementById('edit-dish-modal');
     if (modal) modal.style.display = 'none';
     editingDishIndex = -1;
-};
+}
+window.closeEditDishModal = closeEditDishModal;
 
-window.saveEditedDish = function() {
+function saveEditedDish() {
     if (editingDishIndex < 0 || editingDishIndex >= state.dishes.length) return;
     
     const nameInput = document.getElementById('edit-dish-name-input');
@@ -2027,7 +2028,8 @@ window.saveEditedDish = function() {
     renderHistoryList();
     
     closeEditDishModal();
-};
+}
+window.saveEditedDish = saveEditedDish;
 
 window.resetToPaperMenuDishes = function() {
     if (confirm('确定要清空现有菜品，重新载入全套最新手写纸质菜单吗？')) {
