@@ -617,27 +617,40 @@ function handleSyncMessage(msg) {
     
     switch(msg.type) {
         case 'REQ_SYNC':
-            // 收到其他设备的同步请求，如果我们这有数据，就广播当前最新的正在烤列表和最新编号
-            if (state.orders.length > 0 || state.lastOrderNum > 0) {
-                broadcastMsg({
-                    type: 'SYNC_STATE',
-                    orders: state.orders,
-                    lastOrderNum: state.lastOrderNum
-                });
-            }
+            // 收到其他设备的同步请求，全量广播当前最新状态
+            broadcastMsg({
+                type: 'SYNC_STATE',
+                orders: state.orders,
+                lastOrderNum: state.lastOrderNum,
+                dishes: state.dishes,
+                tags: state.tags
+            });
             break;
             
         case 'SYNC_STATE':
-            // 收到其他设备的最新状态，覆盖本地的订单列表和最新排队序号
-            // 防御机制：如果对方的数据包里订单列表为空，而我本地有正在烤的订单，绝对不能被对方的空数据覆盖！
+            // 收到其他设备的最新状态
             if ((!msg.orders || msg.orders.length === 0) && state.orders.length > 0) {
                 console.log('拦截了空数据包覆盖本地活跃订单的异常同步！');
-                break;
+            } else {
+                state.orders = msg.orders || [];
+                state.lastOrderNum = msg.lastOrderNum || 0;
             }
-            state.orders = msg.orders || [];
-            state.lastOrderNum = msg.lastOrderNum || 0;
+            if (msg.dishes && msg.dishes.length > 0) state.dishes = msg.dishes;
+            if (msg.tags && msg.tags.length > 0) state.tags = msg.tags;
             saveToLocalStorage();
             renderGrillingList();
+            renderSettingsEditor();
+            renderQuickDishesGrid();
+            break;
+            
+        case 'UPDATE_STATE':
+            if (msg.state) {
+                if (msg.state.dishes) state.dishes = msg.state.dishes;
+                if (msg.state.tags) state.tags = msg.state.tags;
+                saveToLocalStorage();
+                renderSettingsEditor();
+                renderQuickDishesGrid();
+            }
             break;
             
         case 'ADD_ORDER':
@@ -1479,13 +1492,16 @@ window.cancelOrder = function(orderId) {
 window.removeDish = function(index) {
     state.dishes.splice(index, 1);
     saveToLocalStorage();
+    broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } });
     renderSettingsEditor();
+    renderQuickDishesGrid();
 };
 
 // 移除外貌标签
 window.removeTag = function(index) {
     state.tags.splice(index, 1);
     saveToLocalStorage();
+    broadcastMsg({ type: 'UPDATE_STATE', state: { tags: state.tags } });
     renderSettingsEditor();
 };
 
@@ -1778,7 +1794,9 @@ document.addEventListener('DOMContentLoaded', () => {
         newDishInput.value = '';
         newDishPriceInput.value = '';
         saveToLocalStorage();
+        broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } });
         renderSettingsEditor();
+        renderQuickDishesGrid();
     });
     
     // 增加特征标签
@@ -1793,6 +1811,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.tags.push(tagName);
         newTagInput.value = '';
         saveToLocalStorage();
+        broadcastMsg({ type: 'UPDATE_STATE', state: { tags: state.tags } });
         renderSettingsEditor();
     });
     
