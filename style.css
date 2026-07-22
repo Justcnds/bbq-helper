@@ -224,6 +224,18 @@ body {
     border-left: 6px solid var(--primary);
 }
 
+.order-card.order-paid {
+    border-left: 6px solid #00e676 !important;
+    background: linear-gradient(145deg, #1d2621 0%, #151d18 100%) !important;
+    box-shadow: 0 4px 14px rgba(0, 230, 118, 0.15) !important;
+}
+
+.order-card.order-paid .order-price-badge {
+    background-color: #00e676 !important;
+    color: #000000 !important;
+    font-weight: 900 !important;
+}
+
 .order-card.history-card {
     border-left: 6px solid var(--text-muted);
     opacity: 0.7;

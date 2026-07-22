@@ -13,8 +13,8 @@
     <!-- 引入 MQTT.js 用于公网/局域网跨网同步 (双CDN备选) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <script>if(typeof mqtt==='undefined'){document.write('<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"><\/script>')}</script>
-    <script src="app.js?v=47" defer></script>
-    <link rel="stylesheet" href="style.css?v=23">
+    <script src="app.js?v=48" defer></script>
+    <link rel="stylesheet" href="style.css?v=24">
     <script>
         // 注册 Service Worker (PWA 离线支持)
         if ('serviceWorker' in navigator) {
@@ -302,6 +302,60 @@
             <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
                 <button type="button" class="btn btn-secondary" onclick="closeEditDishModal()" style="padding: 8px 16px;">取消</button>
                 <button type="button" class="btn btn-primary" onclick="saveEditedDish()" style="padding: 8px 22px; font-weight: bold;">💾 保存修改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改订单 / 临时加酒水菜品弹窗 -->
+    <div id="modify-order-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 440px; width: 92%; max-height: 88vh; padding: 18px; display: flex; flex-direction: column;">
+            <header class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="modify-order-title" style="margin: 0; color: #ffd600; font-size: 1.15rem;">✏️ 修改订单与加酒水</h3>
+                <button type="button" class="close-btn" onclick="closeModifyOrderModal()">&times;</button>
+            </header>
+            <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 12px 2px; display: flex; flex-direction: column; gap: 14px;">
+                
+                <!-- 已有点单项目加减 -->
+                <div>
+                    <label style="font-size: 0.88rem; font-weight: bold; color: var(--text-muted); display: block; margin-bottom: 8px;">已加菜品/酒水列表：</label>
+                    <div id="modify-order-items-container" style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- 动态生成修改项 -->
+                    </div>
+                </div>
+
+                <!-- 快捷加酒水/饮料区 -->
+                <div style="background: rgba(255,255,255,0.04); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                    <label style="font-size: 0.88rem; font-weight: bold; color: #ffd600; display: block; margin-bottom: 8px;">🍺 快捷添加常用酒水饮料：</label>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                        <button type="button" class="btn btn-secondary" onclick="addExtraDrinkToModify('啤酒', 6)" style="font-size: 0.9rem; padding: 8px;">🍺 啤酒 (￥6)</button>
+                        <button type="button" class="btn btn-secondary" onclick="addExtraDrinkToModify('可乐', 4)" style="font-size: 0.9rem; padding: 8px;">🥤 可乐 (￥4)</button>
+                        <button type="button" class="btn btn-secondary" onclick="addExtraDrinkToModify('王老吉', 5)" style="font-size: 0.9rem; padding: 8px;">🧃 王老吉 (￥5)</button>
+                        <button type="button" class="btn btn-secondary" onclick="addExtraDrinkToModify('雪碧', 4)" style="font-size: 0.9rem; padding: 8px;">🍾 雪碧 (￥4)</button>
+                    </div>
+                </div>
+
+                <!-- 自定义临时加菜 -->
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted); display: block; margin-bottom: 6px;">自定义临时加菜/饮料：</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="input-extra-item-name" class="search-input" style="flex: 2; padding: 8px 10px; font-size: 0.9rem;" placeholder="名称如: 冰红茶">
+                        <input type="number" step="0.5" id="input-extra-item-price" class="search-input" style="flex: 1; padding: 8px 6px; font-size: 0.9rem;" placeholder="价格">
+                        <button type="button" class="btn btn-primary" onclick="addCustomExtraItemToModify()" style="padding: 8px 12px; font-size: 0.85rem; white-space: nowrap;">+ 添加</button>
+                    </div>
+                </div>
+
+                <!-- 备注修改 -->
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted); display: block; margin-bottom: 4px;">整单备注修改：</label>
+                    <input type="text" id="input-modify-order-remark" class="search-input" style="padding: 8px 10px; width: 100%; font-size: 0.9rem;" placeholder="如：多放孜然/打包">
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <span id="modify-order-total-badge" style="font-size: 1.1rem; font-weight: 900; color: #ffd600;">合计: ￥0.00</span>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModifyOrderModal()" style="padding: 8px 14px;">取消</button>
+                    <button type="button" class="btn btn-success" onclick="saveModifiedOrder()" style="padding: 8px 18px; font-weight: bold;">💾 保存修改</button>
+                </div>
             </div>
         </div>
     </div>

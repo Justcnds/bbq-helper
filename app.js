@@ -706,9 +706,14 @@ function handleSyncMessage(msg) {
 function renderGrillingList() {
     const listContainer = document.getElementById('grilling-list');
     const countBadge = document.getElementById('grilling-count');
-    countBadge.textContent = state.orders.length;
     
-    if (state.orders.length === 0) {
+    // 过滤当前营业日内的订单 (16:00 到次日 04:00 算同一天)
+    const todayBizDay = getBBQBusinessDay(Date.now());
+    const activeOrders = state.orders.filter(order => getBBQBusinessDay(order.timestamp) === todayBizDay);
+    
+    countBadge.textContent = activeOrders.length;
+    
+    if (activeOrders.length === 0) {
         listContainer.innerHTML = `
             <div class="empty-state">
                 <p>🍢 目前没有正在烤的订单</p>
@@ -718,9 +723,12 @@ function renderGrillingList() {
     }
     
     listContainer.innerHTML = '';
-    state.orders.forEach(order => {
+    activeOrders.forEach(order => {
+        const isPaid = !!order.isPaid;
         const card = document.createElement('div');
-        card.className = 'order-card grilling';
+        card.className = `order-card grilling ${isPaid ? 'order-paid' : ''}`;
+        card.setAttribute('ondblclick', `window.openModifyOrderModal('${order.id}')`);
+        card.title = "双击可加酒水或修改菜品";
         
         // 格式化时间
         const timeStr = new Date(order.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
@@ -761,9 +769,26 @@ function renderGrillingList() {
             reqsHtml += `<span class="req-badge">${r}</span>`;
         });
         
+        const priceBadgeHtml = isPaid 
+            ? `<span class="order-price-badge" style="background-color: #00e676; color: #000; font-weight: 900;">💰 已付款 ￥${orderTotal.toFixed(2)}</span>`
+            : `<span class="order-price-badge">￥${orderTotal.toFixed(2)}</span>`;
+            
+        const footerHtml = isPaid
+            ? `<div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0, 230, 118, 0.12); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(0, 230, 118, 0.3);">
+                <span style="color: #00e676; font-weight: bold; font-size: 0.9rem;">✅ 已付款 (双击卡片加酒水)</span>
+                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 4px 10px; font-size: 0.8rem;">✏️ 改单加酒</button>
+               </div>`
+            : `<div class="slide-confirm-container" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 6px 10px; font-size: 0.8rem; flex-shrink: 0;" title="修改订单">✏️ 改单加酒</button>
+                <div style="flex: 1; position: relative;">
+                    <span class="slide-confirm-text">👉 右滑确认付款</span>
+                    <input type="range" class="slide-confirm-range" min="0" max="100" value="0" onmousedown="handleSliderStart(event)" ontouchstart="handleSliderStart(event)" oninput="handleSlideConfirm(this, '${order.id}')" onchange="resetSlideConfirm(this)">
+                </div>
+               </div>`;
+        
         card.innerHTML = `
             <!-- 右上角迷你取消订单按钮 -->
-            <button class="mini-delete-btn" data-step="1" onclick="deleteOrderStep(this, '${order.id}')" title="取消订单">🗑️</button>
+            <button class="mini-delete-btn" data-step="1" onclick="event.stopPropagation(); deleteOrderStep(this, '${order.id}')" title="取消订单">🗑️</button>
             
             <div class="order-card-header">
                 <span class="order-num">#${order.num}</span>
@@ -1236,6 +1261,174 @@ function renderQuickDishesGrid(filterQuery = '') {
         dishesContainer.appendChild(card);
     });
 }
+
+// 确认付款完成
+window.completeOrder = function(orderId) {
+    const order = state.orders.find(o => o.id === orderId);
+    if (order) {
+        order.isPaid = true;
+        order.status = 'completed';
+        
+        // 播放金币音效与到账播报
+        announceComplete(order);
+        
+        // 写入历史记录 (去重)
+        if (!state.history.some(o => o.id === order.id)) {
+            state.history.unshift(order);
+            if (state.history.length > 100) state.history.pop();
+        }
+        
+        saveToLocalStorage();
+        renderGrillingList();
+        renderHistoryList();
+        
+        // 全端持久化广播
+        broadcastMsg({
+            type: 'SYNC_STATE',
+            orders: state.orders,
+            history: state.history,
+            lastOrderNum: state.lastOrderNum,
+            dishes: state.dishes,
+            tags: state.tags
+        }, true);
+    }
+};
+
+// --- 双击修改订单与加酒水弹窗逻辑 ---
+let editingOrderId = null;
+let editingOrderItems = {};
+
+window.openModifyOrderModal = function(orderId) {
+    const order = state.orders.find(o => o.id === orderId);
+    if (!order) return;
+    editingOrderId = orderId;
+    editingOrderItems = JSON.parse(JSON.stringify(order.items || {}));
+    
+    const titleEl = document.getElementById('modify-order-title');
+    if (titleEl) titleEl.textContent = `✏️ 修改 #${order.num}号订单 (${order.tableNum || '1号桌'})`;
+    
+    const remarkInput = document.getElementById('input-modify-order-remark');
+    if (remarkInput) remarkInput.value = order.customTag || '';
+    
+    renderModifyOrderItems();
+    const modal = document.getElementById('modify-order-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.zIndex = '999999';
+    }
+};
+
+window.closeModifyOrderModal = function() {
+    const modal = document.getElementById('modify-order-modal');
+    if (modal) modal.style.display = 'none';
+    editingOrderId = null;
+    editingOrderItems = {};
+};
+
+function renderModifyOrderItems() {
+    const container = document.getElementById('modify-order-items-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    let total = 0;
+    const entries = Object.entries(editingOrderItems);
+    if (entries.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">暂无菜品或酒水</p>';
+    } else {
+        entries.forEach(([name, qty]) => {
+            const unitPrice = getDishPrice(name);
+            const itemTotal = unitPrice * qty;
+            total += itemTotal;
+            
+            const row = document.createElement('div');
+            row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);';
+            row.innerHTML = `
+                <div style="flex: 1;">
+                    <span style="font-weight: bold; font-size: 0.95rem;">${name}</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 6px;">(￥${unitPrice}/份)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button type="button" class="btn btn-secondary" onclick="updateModifyItemQty('${name}', -1)" style="padding: 4px 10px; font-weight: bold;">-</button>
+                    <span style="font-weight: bold; min-width: 20px; text-align: center; color: #ffd600;">${qty}</span>
+                    <button type="button" class="btn btn-secondary" onclick="updateModifyItemQty('${name}', 1)" style="padding: 4px 10px; font-weight: bold;">+</button>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+    }
+    
+    const badge = document.getElementById('modify-order-total-badge');
+    if (badge) badge.textContent = `合计: ￥${total.toFixed(2)}`;
+}
+
+window.updateModifyItemQty = function(name, change) {
+    if (!editingOrderItems[name]) return;
+    editingOrderItems[name] += change;
+    if (editingOrderItems[name] <= 0) {
+        delete editingOrderItems[name];
+    }
+    renderModifyOrderItems();
+};
+
+window.addExtraDrinkToModify = function(drinkName, price) {
+    if (!state.dishes.some(d => d.name === drinkName)) {
+        state.dishes.push({ name: drinkName, price: price });
+    }
+    editingOrderItems[drinkName] = (editingOrderItems[drinkName] || 0) + 1;
+    renderModifyOrderItems();
+};
+
+window.addCustomExtraItemToModify = function() {
+    const nameInput = document.getElementById('input-extra-item-name');
+    const priceInput = document.getElementById('input-extra-item-price');
+    const name = nameInput ? nameInput.value.trim() : '';
+    const priceStr = priceInput ? priceInput.value.trim() : '';
+    const price = parseFloat(priceStr) || 0;
+    
+    if (!name) {
+        alert('请输入加菜/饮料名称！');
+        return;
+    }
+    if (!state.dishes.some(d => d.name === name)) {
+        state.dishes.push({ name: name, price: price });
+    }
+    editingOrderItems[name] = (editingOrderItems[name] || 0) + 1;
+    if (nameInput) nameInput.value = '';
+    if (priceInput) priceInput.value = '';
+    renderModifyOrderItems();
+};
+
+window.saveModifiedOrder = function() {
+    if (!editingOrderId) return;
+    const order = state.orders.find(o => o.id === editingOrderId);
+    if (!order) return;
+    
+    const remarkInput = document.getElementById('input-modify-order-remark');
+    order.items = JSON.parse(JSON.stringify(editingOrderItems));
+    order.customTag = remarkInput ? remarkInput.value.trim() : '';
+    
+    // 如果已经在历史记录里，也同步更新
+    const histOrder = state.history.find(h => h.id === editingOrderId);
+    if (histOrder) {
+        histOrder.items = JSON.parse(JSON.stringify(editingOrderItems));
+        histOrder.customTag = order.customTag;
+    }
+    
+    saveToLocalStorage();
+    broadcastMsg({
+        type: 'SYNC_STATE',
+        orders: state.orders,
+        history: state.history,
+        lastOrderNum: state.lastOrderNum,
+        dishes: state.dishes,
+        tags: state.tags
+    }, true);
+    
+    renderGrillingList();
+    renderHistoryList();
+    closeModifyOrderModal();
+    alert('订单已成功更新！实时消费金额已同步重新计算。');
+};
 
 // 价格计算助手函数
 function getDishPrice(dishName) {
