@@ -596,14 +596,14 @@ function connectMQTT() {
     });
 }
 
-function broadcastMsg(msg) {
+function broadcastMsg(msg, retain = false) {
     if (!mqttClient || !mqttClient.connected) {
         console.log('未联机，消息仅限本地处理');
         return false;
     }
     msg.senderId = myClientId; // 附带发送者ID，防止自己接收并重复处理
     const topic = `bbq/helper/rooms/${state.roomId}`;
-    mqttClient.publish(topic, JSON.stringify(msg), { qos: 1 });
+    mqttClient.publish(topic, JSON.stringify(msg), { qos: 1, retain: retain });
     return true;
 }
 
@@ -624,19 +624,15 @@ function handleSyncMessage(msg) {
                 lastOrderNum: state.lastOrderNum,
                 dishes: state.dishes,
                 tags: state.tags
-            });
+            }, true);
             break;
             
         case 'SYNC_STATE':
             // 收到其他设备的最新状态
-            if ((!msg.orders || msg.orders.length === 0) && state.orders.length > 0) {
-                console.log('拦截了空数据包覆盖本地活跃订单的异常同步！');
-            } else {
-                state.orders = msg.orders || [];
-                state.lastOrderNum = msg.lastOrderNum || 0;
-            }
             if (msg.dishes && msg.dishes.length > 0) state.dishes = msg.dishes;
             if (msg.tags && msg.tags.length > 0) state.tags = msg.tags;
+            if (msg.orders && msg.orders.length > 0) state.orders = msg.orders;
+            if (msg.lastOrderNum !== undefined) state.lastOrderNum = msg.lastOrderNum;
             saveToLocalStorage();
             renderGrillingList();
             renderSettingsEditor();
@@ -1794,7 +1790,7 @@ document.addEventListener('DOMContentLoaded', () => {
         newDishInput.value = '';
         newDishPriceInput.value = '';
         saveToLocalStorage();
-        broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } });
+        broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } }, true);
         renderSettingsEditor();
         renderQuickDishesGrid();
     });
@@ -1811,7 +1807,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.tags.push(tagName);
         newTagInput.value = '';
         saveToLocalStorage();
-        broadcastMsg({ type: 'UPDATE_STATE', state: { tags: state.tags } });
+        broadcastMsg({ type: 'UPDATE_STATE', state: { tags: state.tags } }, true);
         renderSettingsEditor();
     });
     
@@ -2093,7 +2089,7 @@ window.updateDishNameInline = function(idx, newName) {
     if (!name) return;
     state.dishes[idx].name = name;
     saveToLocalStorage();
-    broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } });
+    broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } }, true);
     renderQuickDishesGrid();
 };
 
@@ -2103,7 +2099,7 @@ window.updateDishPriceInline = function(idx, newPriceStr) {
     if (isNaN(price) || price < 0) return;
     state.dishes[idx].price = price;
     saveToLocalStorage();
-    broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } });
+    broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } }, true);
     renderQuickDishesGrid();
 };
 
