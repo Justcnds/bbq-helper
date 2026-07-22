@@ -1294,7 +1294,7 @@ window.completeOrder = function(orderId) {
     }
 };
 
-// --- 双击修改订单与加酒水弹窗逻辑 ---
+// --- 双击修改订单与加菜酒水弹窗逻辑 (与点单拼音搜索/网格完全一致) ---
 let editingOrderId = null;
 let editingOrderItems = {};
 
@@ -1307,10 +1307,21 @@ window.openModifyOrderModal = function(orderId) {
     const titleEl = document.getElementById('modify-order-title');
     if (titleEl) titleEl.textContent = `✏️ 修改 #${order.num}号订单 (${order.tableNum || '1号桌'})`;
     
+    const searchInput = document.getElementById('input-modify-dish-search');
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.oninput = (e) => {
+            renderModifyDishesGrid(e.target.value);
+            const clearBtn = document.getElementById('btn-clear-modify-search');
+            if (clearBtn) clearBtn.style.display = e.target.value ? 'block' : 'none';
+        };
+    }
+    
     const remarkInput = document.getElementById('input-modify-order-remark');
     if (remarkInput) remarkInput.value = order.customTag || '';
     
-    renderModifyOrderItems();
+    renderModifyDishesGrid('');
+    
     const modal = document.getElementById('modify-order-modal');
     if (modal) {
         modal.style.display = 'flex';
