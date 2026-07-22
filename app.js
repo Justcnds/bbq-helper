@@ -663,16 +663,14 @@ function handleSyncMessage(msg) {
             break;
             
         case 'COMPLETE_ORDER':
-            // 收到完成订单广播，将其移至本地历史
-            const compIdx = state.orders.findIndex(o => o.id === msg.orderId);
-            if (compIdx !== -1) {
-                const order = state.orders.splice(compIdx, 1)[0];
-                order.status = 'completed';
-                // 播放完成订单音效与语音到账播报
-                announceComplete(order);
-                // 添加到历史（去重）
-                if (!state.history.some(o => o.id === order.id)) {
-                    state.history.unshift(order); // 最新的排在最前面
+            // 收到完成/已付款广播，标记 isPaid=true，保持留在【正在烤】列表中 (变绿框)
+            const targetCompOrder = state.orders.find(o => o.id === msg.orderId);
+            if (targetCompOrder) {
+                targetCompOrder.isPaid = true;
+                targetCompOrder.status = 'completed';
+                announceComplete(targetCompOrder);
+                if (!state.history.some(o => o.id === targetCompOrder.id)) {
+                    state.history.unshift(JSON.parse(JSON.stringify(targetCompOrder)));
                     if (state.history.length > 100) state.history.pop();
                 }
                 saveToLocalStorage();
@@ -1597,27 +1595,39 @@ window.resetSlideConfirm = function(el) {
 
 // 点击已完成/已拿走
 window.completeOrder = function(orderId) {
-    const orderIdx = state.orders.findIndex(o => o.id === orderId);
-    if (orderIdx !== -1) {
-        const order = state.orders.splice(orderIdx, 1)[0];
+    const order = state.orders.find(o => o.id === orderId);
+    if (order) {
+        order.isPaid = true;
         order.status = 'completed';
         
         // 播放金币音效并语音播报到账信息
         announceComplete(order);
         
-        // 保存到本地历史记录
-        state.history.unshift(order);
-        if (state.history.length > 100) state.history.pop();
+        // 复制保存到本地历史记录 (去重)
+        if (!state.history.some(o => o.id === order.id)) {
+            state.history.unshift(JSON.parse(JSON.stringify(order)));
+            if (state.history.length > 100) state.history.pop();
+        }
         
         saveToLocalStorage();
         renderGrillingList();
         renderHistoryList();
         
-        // 广播完成信息给其他终端，使它们的屏幕上也同步消除
+        // 广播完成信息给其他终端，保持留在【正在烤】列表中 (全端显示绿框已付款)
         broadcastMsg({
             type: 'COMPLETE_ORDER',
             orderId: orderId
         });
+        
+        // 全端状态持久化同步
+        broadcastMsg({
+            type: 'SYNC_STATE',
+            orders: state.orders,
+            history: state.history,
+            lastOrderNum: state.lastOrderNum,
+            dishes: state.dishes,
+            tags: state.tags
+        }, true);
     }
 };
 
