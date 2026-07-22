@@ -1329,6 +1329,17 @@ window.openModifyOrderModal = function(orderId) {
     }
 };
 
+window.clearModifySearch = function() {
+    const searchInput = document.getElementById('input-modify-dish-search');
+    if (searchInput) {
+        searchInput.value = '';
+        renderModifyDishesGrid('');
+        const clearBtn = document.getElementById('btn-clear-modify-search');
+        if (clearBtn) clearBtn.style.display = 'none';
+        searchInput.focus();
+    }
+};
+
 window.closeModifyOrderModal = function() {
     const modal = document.getElementById('modify-order-modal');
     if (modal) modal.style.display = 'none';
