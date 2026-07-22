@@ -793,7 +793,7 @@ function renderGrillingList() {
             <div class="order-card-header">
                 <span class="order-num">#${order.num}</span>
                 <span class="order-table-badge">${tableStr}</span>
-                <span class="order-price-badge">￥${orderTotal.toFixed(2)}</span>
+                ${priceBadgeHtml}
                 <span class="order-time">
                     ${timeStr}
                     <strong class="elapsed-time-tag" data-timestamp="${order.timestamp}" style="font-size: 0.8rem; font-weight: bold; margin-left: 4px; color: var(--text-muted);">(等0秒)</strong>
@@ -811,11 +811,7 @@ function renderGrillingList() {
                 </div>
             </div>
             <div class="order-card-footer" style="padding-top: 4px;">
-                <!-- 滑动确认条，防止误触 -->
-                <div class="slide-confirm-container">
-                    <span class="slide-confirm-text">👉 右滑确认拿走</span>
-                    <input type="range" class="slide-confirm-range" min="0" max="100" value="0" onmousedown="handleSliderStart(event)" ontouchstart="handleSliderStart(event)" oninput="handleSlideConfirm(this, '${order.id}')" onchange="resetSlideConfirm(this)">
-                </div>
+                ${footerHtml}
             </div>
         `;
         
