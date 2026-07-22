@@ -1298,56 +1298,7 @@ window.completeOrder = function(orderId) {
 let editingOrderId = null;
 let editingOrderItems = {};
 
-window.openModifyOrderModal = function(orderId) {
-    const order = state.orders.find(o => o.id === orderId);
-    if (!order) return;
-    editingOrderId = orderId;
-    editingOrderItems = JSON.parse(JSON.stringify(order.items || {}));
-    
-    const titleEl = document.getElementById('modify-order-title');
-    if (titleEl) titleEl.textContent = `✏️ 修改 #${order.num}号订单 (${order.tableNum || '1号桌'})`;
-    
-    const searchInput = document.getElementById('input-modify-dish-search');
-    if (searchInput) {
-        searchInput.value = '';
-        searchInput.oninput = (e) => {
-            renderModifyDishesGrid(e.target.value);
-            const clearBtn = document.getElementById('btn-clear-modify-search');
-            if (clearBtn) clearBtn.style.display = e.target.value ? 'block' : 'none';
-        };
-    }
-    
-    const remarkInput = document.getElementById('input-modify-order-remark');
-    if (remarkInput) remarkInput.value = order.customTag || '';
-    
-    renderModifyDishesGrid('');
-    
-    const modal = document.getElementById('modify-order-modal');
-    if (modal) {
-        modal.style.display = 'flex';
-        modal.style.zIndex = '999999';
-    }
-};
-
-window.clearModifySearch = function() {
-    const searchInput = document.getElementById('input-modify-dish-search');
-    if (searchInput) {
-        searchInput.value = '';
-        renderModifyDishesGrid('');
-        const clearBtn = document.getElementById('btn-clear-modify-search');
-        if (clearBtn) clearBtn.style.display = 'none';
-        searchInput.focus();
-    }
-};
-
-window.closeModifyOrderModal = function() {
-    const modal = document.getElementById('modify-order-modal');
-    if (modal) modal.style.display = 'none';
-    editingOrderId = null;
-    editingOrderItems = {};
-};
-
-function renderModifyDishesGrid(filterQuery = '') {
+window.renderModifyDishesGrid = function(filterQuery = '') {
     const container = document.getElementById('modify-dishes-grid');
     if (!container) return;
     container.innerHTML = '';
@@ -1386,7 +1337,7 @@ function renderModifyDishesGrid(filterQuery = '') {
     
     // 计算并更新合计金额
     updateModifyOrderTotalBadge();
-}
+};
 
 window.changeModifyDishQty = function(dishName, delta) {
     const current = editingOrderItems[dishName] || 0;
@@ -1398,7 +1349,7 @@ window.changeModifyDishQty = function(dishName, delta) {
     }
     const searchInput = document.getElementById('input-modify-dish-search');
     const query = searchInput ? searchInput.value : '';
-    renderModifyDishesGrid(query);
+    window.renderModifyDishesGrid(query);
 };
 
 function updateModifyOrderTotalBadge() {
@@ -1409,6 +1360,55 @@ function updateModifyOrderTotalBadge() {
     const badge = document.getElementById('modify-order-total-badge');
     if (badge) badge.textContent = `最新合计: ￥${total.toFixed(2)}`;
 }
+
+window.openModifyOrderModal = function(orderId) {
+    const order = state.orders.find(o => o.id === orderId);
+    if (!order) return;
+    editingOrderId = orderId;
+    editingOrderItems = JSON.parse(JSON.stringify(order.items || {}));
+    
+    const titleEl = document.getElementById('modify-order-title');
+    if (titleEl) titleEl.textContent = `✏️ 修改 #${order.num}号订单 (${order.tableNum || '1号桌'})`;
+    
+    const searchInput = document.getElementById('input-modify-dish-search');
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.oninput = (e) => {
+            window.renderModifyDishesGrid(e.target.value);
+            const clearBtn = document.getElementById('btn-clear-modify-search');
+            if (clearBtn) clearBtn.style.display = e.target.value ? 'block' : 'none';
+        };
+    }
+    
+    const remarkInput = document.getElementById('input-modify-order-remark');
+    if (remarkInput) remarkInput.value = order.customTag || '';
+    
+    window.renderModifyDishesGrid('');
+    
+    const modal = document.getElementById('modify-order-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.zIndex = '999999';
+    }
+};
+
+window.clearModifySearch = function() {
+    const searchInput = document.getElementById('input-modify-dish-search');
+    if (searchInput) {
+        searchInput.value = '';
+        window.renderModifyDishesGrid('');
+        const clearBtn = document.getElementById('btn-clear-modify-search');
+        if (clearBtn) clearBtn.style.display = 'none';
+        searchInput.focus();
+    }
+};
+
+window.closeModifyOrderModal = function() {
+    const modal = document.getElementById('modify-order-modal');
+    if (modal) modal.style.display = 'none';
+    editingOrderId = null;
+    editingOrderItems = {};
+};
 
 window.saveModifiedOrder = function() {
     if (!editingOrderId) return;
