@@ -375,7 +375,7 @@ body {
 }
 
 .order-card-footer button {
-    width: 100%;
+    width: auto;
 }
 
 /* SETTINGS CARD STYLE */
