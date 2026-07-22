@@ -775,12 +775,12 @@ function renderGrillingList() {
             
         const footerHtml = isPaid
             ? `<div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0, 230, 118, 0.12); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(0, 230, 118, 0.3);">
-                <span style="color: #00e676; font-weight: bold; font-size: 0.9rem;">✅ 已付款 (双击卡片加酒水)</span>
-                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 4px 10px; font-size: 0.8rem;">✏️ 改单加酒</button>
+                <span style="color: #00e676; font-weight: bold; font-size: 0.9rem;">✅ 已付款 (双击卡片加菜/加酒)</span>
+                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 4px 10px; font-size: 0.8rem;">✏️ 改单加菜</button>
                </div>`
-            : `<div class="slide-confirm-container" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 6px 10px; font-size: 0.8rem; flex-shrink: 0;" title="修改订单">✏️ 改单加酒</button>
-                <div style="flex: 1; position: relative;">
+            : `<div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 0 12px; height: 44px; font-size: 0.85rem; font-weight: bold; border-radius: 22px; flex-shrink: 0; white-space: nowrap;" title="修改订单/加菜">✏️ 改单加菜</button>
+                <div class="slide-confirm-container" style="flex: 1;">
                     <span class="slide-confirm-text">👉 右滑确认付款</span>
                     <input type="range" class="slide-confirm-range" min="0" max="100" value="0" onmousedown="handleSliderStart(event)" ontouchstart="handleSliderStart(event)" oninput="handleSlideConfirm(this, '${order.id}')" onchange="resetSlideConfirm(this)">
                 </div>
