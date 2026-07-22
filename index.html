@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#FFD600">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="烧烤助手">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-512.png">
+    <title>烧烤联机助手</title>
+    <!-- 引入 MQTT.js 用于公网/局域网跨网同步 (双CDN备选) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    <script>if(typeof mqtt==='undefined'){document.write('<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"><\/script>')}</script>
+    <script src="app.js?v=40" defer></script>
+    <link rel="stylesheet" href="style.css?v=16">
+    <script>
+        // 注册 Service Worker (PWA 离线支持)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('[PWA] Service Worker 注册成功'))
+                    .catch(err => console.warn('[PWA] SW 注册失败', err));
+            });
+        }
+    </script>
+</head>
+<body>
+    <!-- 1. 新设备欢迎与房间创建/加入全屏遮罩 -->
+    <div id="room-welcome-overlay" class="room-overlay">
+        <div class="welcome-card">
+            <div class="welcome-header">
+                <h2>🍢 烧烤联机助手</h2>
+                <p>实时订单流同步 • 局域网/公网双模式 • 语音自动播报</p>
+            </div>
+            <div class="welcome-body">
+                <div class="input-group-vertical">
+                    <label for="welcome-room-id">请输入房间号 (只能是数字或字母)：</label>
+                    <input type="text" id="welcome-room-id" placeholder="例如: 6688" class="custom-input large-input">
+                </div>
+                <div class="welcome-actions">
+                    <button id="btn-welcome-create" class="btn btn-success btn-large" onclick="window.handleWelcomeRoomAction && window.handleWelcomeRoomAction('创建并进入')">🆕 创建新房间</button>
+                    <button id="btn-welcome-join" class="btn btn-primary btn-large" onclick="window.handleWelcomeRoomAction && window.handleWelcomeRoomAction('加入并进入')">👥 加入已有房间</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 顶部状态栏与标题 -->
+    <header class="app-header">
+        <div class="logo-area">
+            <h1>🔥 烧烤联机助手</h1>
+            <span id="connection-status" class="status-badge disconnected">未联机</span>
+        </div>
+        <div class="room-info" id="header-room-display">未加入房间</div>
+    </header>
+
+    <!-- 主体内容区域 -->
+    <main class="app-content">
+        
+        <!-- Tab 1: 正在烤看板 (默认显示) -->
+        <section id="tab-grilling" class="tab-pane active">
+            <div class="section-title">
+                <h2>正在烤的订单 (<span id="grilling-count">0</span>)</h2>
+                <button id="btn-quick-order-trigger" class="btn btn-primary btn-large">+ 快速下单</button>
+            </div>
+            <div id="grilling-list" class="order-list">
+                <!-- 订单卡片占位 -->
+                <div class="empty-state">
+                    <p>🍢 目前没有正在烤的订单</p>
+                    <p class="sub-text">点击右上角“+ 快速下单”开始记录吧</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab 2: 历史订单 -->
+        <section id="tab-history" class="tab-pane">
+            <div class="section-title">
+                <h2>今日已完成历史 (<span id="history-count">0</span>)</h2>
+                <button id="btn-clear-history" class="btn btn-danger">一键清空</button>
+            </div>
+            
+            <!-- 今日营业额卡片 -->
+            <div class="revenue-summary-card" style="display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div class="rev-icon">💰</div>
+                    <div class="rev-info">
+                        <span class="rev-label">今日营业额 (16点-次日4点)</span>
+                        <span id="today-revenue-display" class="rev-amount">￥0.00</span>
+                    </div>
+                </div>
+                <button id="btn-show-all-history" class="btn" style="background: rgba(255, 214, 0, 0.15); border: 1.5px solid var(--primary); color: var(--primary); padding: 8px 12px; border-radius: 8px; font-weight: bold; font-size: 0.9rem; white-space: nowrap;">📅 历史账单</button>
+            </div>
+
+            <div id="history-list" class="order-list">
+                <div class="empty-state">
+                    <p>📦 暂无已完成的订单记录</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab 3: 设置页面 -->
+        <section id="tab-settings" class="tab-pane">
+            <h2>⚙️ 系统设置</h2>
+            
+            <!-- 房间设置 -->
+            <div class="settings-card">
+                <h3>👥 联机房间设置</h3>
+                <div class="form-group">
+                    <label for="input-room-id">联机房间号 (多台手机输入相同号码即可同步)：</label>
+                    <div class="input-with-button">
+                        <input type="text" id="input-room-id" placeholder="例如: bbq-8888" value="bbq-6688">
+                        <button id="btn-connect-room" class="btn btn-success">连接/切换房间</button>
+                        <button id="btn-leave-room" class="btn btn-danger">退出房间</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 语音设置 -->
+            <div class="settings-card">
+                <h3>🔊 语音播报设置</h3>
+                <div class="form-group row-align">
+                    <label for="switch-audio">开启新订单与操作音效</label>
+                    <label class="switch">
+                        <input type="checkbox" id="switch-audio" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <button id="btn-test-audio" class="btn btn-secondary">🔊 测试系统音效</button>
+            </div>
+
+            <!-- 菜品菜单管理 -->
+            <div class="settings-card">
+                <h3>🍢 菜品菜单管理</h3>
+                <div class="menu-editor-section">
+                    <div class="input-with-button" style="display: flex; gap: 8px;">
+                        <input type="text" id="input-new-dish" placeholder="新菜品名称，如: 烤生蚝" style="flex: 2;">
+                        <input type="number" id="input-new-dish-price" placeholder="价格 (元)，如: 12" step="0.5" style="flex: 1; min-width: 80px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: var(--text-color);">
+                        <button id="btn-add-dish" class="btn btn-primary" style="flex: 1; min-width: 90px;">添加菜品</button>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #ffaa00; margin: 8px 0 4px 0;">💡 提示：点击任意菜品标签可弹出修改名字和价格，点击 ✕ 可删除。</p>
+                    <div id="dish-list-edit" class="tag-edit-container">
+                        <!-- 动态生成菜品编辑标签 -->
+                    </div>
+                    <button id="btn-reset-default-dishes" class="btn btn-secondary" onclick="resetToPaperMenuDishes()" style="margin-top: 12px; font-size: 0.85rem; width: 100%;">🔄 一键恢复为最新手写纸质菜单</button>
+                </div>
+            </div>
+
+            <!-- 特征标签管理 -->
+            <div class="settings-card">
+                <h3>🏷️ 特征标签管理</h3>
+                <div class="menu-editor-section">
+                    <div class="input-with-button">
+                        <input type="text" id="input-new-tag" placeholder="输入新特征，如: 戴墨镜">
+                        <button id="btn-add-tag" class="btn btn-primary">添加标签</button>
+                    </div>
+                    <div id="tag-list-edit" class="tag-edit-container">
+                        <!-- 动态生成特征编辑标签 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 快捷下单全屏抽屉/模态框 -->
+    <div id="order-modal" class="modal">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h2>🆕 快速下单</h2>
+                <button id="btn-close-modal" class="close-btn">&times;</button>
+            </header>
+            <div class="modal-body">
+                <!-- 1. 用餐方式与桌号选择 -->
+                <div class="order-section">
+                    <span class="section-num">1</span>
+                    <h3>用餐方式与桌号</h3>
+                    
+                    <!-- 送过去 (默认第1个) vs 过来拿 (第2个) -->
+                    <div class="delivery-toggle" id="delivery-type-container">
+                        <button type="button" class="delivery-btn active" data-type="送过去">送过去 (堂食)</button>
+                        <button type="button" class="delivery-btn" data-type="过来拿">过来拿 (自提)</button>
+                    </div>
+
+                    <!-- 送过去时的桌号选择区域 (默认显示，选过来拿时自动隐藏) -->
+                    <div class="delivery-details-panel" id="delivery-details-panel">
+                        <div class="feature-group">
+                            <span class="group-label">桌号：</span>
+                            <div class="group-buttons grid-table-nums" id="group-table-num">
+                                <button type="button" class="table-num-btn active" data-num="1号桌">1号桌</button>
+                                <button type="button" class="table-num-btn" data-num="2号桌">2号桌</button>
+                                <button type="button" class="table-num-btn" data-num="3号桌">3号桌</button>
+                                <button type="button" class="table-num-btn" data-num="4号桌">4号桌</button>
+                                <button type="button" class="table-num-btn" data-num="5号桌">5号桌</button>
+                                <button type="button" class="table-num-btn" data-num="6号桌">6号桌</button>
+                                <button type="button" class="table-num-btn" data-num="7号桌">7号桌</button>
+                                <button type="button" class="table-num-btn" data-num="8号桌">8号桌</button>
+                                <button type="button" class="table-num-btn" data-num="9号桌">9号桌</button>
+                                <button type="button" class="table-num-btn" data-num="10号桌">10号桌</button>
+                                <button type="button" class="table-num-btn" data-num="11号桌">11号桌</button>
+                                <button type="button" class="table-num-btn" data-num="12号桌">12号桌</button>
+                                <button type="button" class="table-num-btn" data-num="店外">店外</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 整单备注框 -->
+                    <div class="feature-group" style="margin-top: 10px;">
+                        <input type="text" id="input-custom-feature" placeholder="填写整单备注（如：加烧烤料/多辣椒粉/特要熟透）" class="custom-input">
+                    </div>
+                </div>
+
+                <!-- 2. 菜品选择（带拼音搜索与一键清除） -->
+                <div class="order-section">
+                    <span class="section-num">2</span>
+                    <h3>选择菜品 (快捷拼音搜索与加减)</h3>
+                    
+                    <!-- 拼音首字母/名称搜索框 -->
+                    <div class="dish-search-wrapper">
+                        <input type="text" id="input-dish-search" placeholder="🔍 输入菜品或拼音首字母 (如 nrbc 找牛肉把串)" class="search-input">
+                        <button type="button" id="btn-clear-search" class="clear-search-btn" title="清空搜索">✕</button>
+                    </div>
+
+                    <div class="dishes-grid" id="quick-dishes-container">
+                        <!-- 动态生成菜品加减按钮 -->
+                    </div>
+                </div>
+
+                <!-- 3. 口味与要求 -->
+                <div class="order-section">
+                    <span class="section-num">3</span>
+                    <h3>口味与打包</h3>
+                    <div class="spicy-selector-three" id="spicy-container">
+                        <button class="spicy-btn active" data-spicy="不辣">不辣</button>
+                        <button class="spicy-btn" data-spicy="微辣">微辣</button>
+                        <button class="spicy-btn" data-spicy="辣">辣</button>
+                    </div>
+                    <div class="requirements-container" id="reqs-container">
+                        <button class="req-btn" data-req="打包">🛍️ 打包</button>
+                    </div>
+                </div>
+            </div>
+            <footer class="modal-footer">
+                <div class="footer-left">
+                    <span id="order-total-price" class="total-price-badge">合计: ￥0.00</span>
+                </div>
+                <div class="footer-right">
+                    <button id="btn-cancel-order" class="btn btn-secondary btn-large">取消</button>
+                    <button id="btn-submit-order" class="btn btn-success btn-large btn-submit">🔥 确认下单</button>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- 底部导航栏 -->
+    <nav class="app-nav">
+        <button class="nav-item active" data-tab="tab-grilling">
+            <span class="nav-icon">🍢</span>
+            <span class="nav-label">正在烤</span>
+        </button>
+        <button class="nav-item" data-tab="tab-history">
+            <span class="nav-icon">📦</span>
+            <span class="nav-label">已完成</span>
+        </button>
+        <button class="nav-item" data-tab="tab-settings">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">设置</span>
+        </button>
+    </nav>
+
+    <!-- 历史账单弹窗 -->
+    <div id="all-history-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-height: 85vh; display: flex; flex-direction: column;">
+            <header class="modal-header">
+                <h2>📅 历史账单与总营业额</h2>
+                <button id="btn-close-all-history" class="close-btn">&times;</button>
+            </header>
+            <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 15px 5px;">
+                <div id="all-history-records-container">
+                    <!-- 动态生成每日营业额分组记录 -->
+                </div>
+            </div>
+        </div>
+    <!-- 编辑菜品弹窗 -->
+    <div id="edit-dish-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 380px; padding: 20px;">
+            <header class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: #ffaa00; font-size: 1.15rem;">✏️ 编辑菜品名称与价格</h3>
+                <button type="button" class="close-btn" onclick="closeEditDishModal()">&times;</button>
+            </header>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px; margin-top: 14px;">
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted); display: block; margin-bottom: 4px;">菜品名称</label>
+                    <input type="text" id="edit-dish-name-input" class="search-input" style="padding: 10px 12px; width: 100%; border: 1.5px solid #444;" placeholder="输入菜品名称">
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted); display: block; margin-bottom: 4px;">单价 (元)</label>
+                    <input type="number" step="0.5" id="edit-dish-price-input" class="search-input" style="padding: 10px 12px; width: 100%; border: 1.5px solid #444;" placeholder="输入价格">
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeEditDishModal()" style="padding: 8px 16px;">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditedDish()" style="padding: 8px 22px; font-weight: bold;">💾 保存修改</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

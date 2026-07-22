@@ -1,0 +1,37 @@
+{
+    "id": "com.bbq.helper.app",
+    "name": "烧烤联机助手",
+    "short_name": "烧烤助手",
+    "description": "实时订单同步 • 多端联机 • 极速语音提示",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "display_override": ["standalone", "window-controls-overlay"],
+    "background_color": "#111111",
+    "theme_color": "#FFD600",
+    "orientation": "portrait",
+    "lang": "zh-CN",
+    "dir": "ltr",
+    "categories": ["food", "utilities"],
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "正在烤",
+            "url": "/",
+            "description": "查看当前正在制作的烧烤订单"
+        }
+    ]
+}
