@@ -2045,4 +2045,21 @@ window.resetToPaperMenuDishes = function() {
     }
 };
 
+window.forcePurgeCache = function() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (let registration of registrations) {
+                registration.unregister();
+            }
+            caches.keys().then(names => {
+                Promise.all(names.map(name => caches.delete(name))).then(() => {
+                    window.location.href = window.location.origin + window.location.pathname + '?t=' + Date.now();
+                });
+            });
+        });
+    } else {
+        window.location.href = window.location.origin + window.location.pathname + '?t=' + Date.now();
+    }
+};
+
 

@@ -13,8 +13,8 @@
     <!-- 引入 MQTT.js 用于公网/局域网跨网同步 (双CDN备选) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <script>if(typeof mqtt==='undefined'){document.write('<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"><\/script>')}</script>
-    <script src="app.js?v=41" defer></script>
-    <link rel="stylesheet" href="style.css?v=17">
+    <script src="app.js?v=42" defer></script>
+    <link rel="stylesheet" href="style.css?v=18">
     <script>
         // 注册 Service Worker (PWA 离线支持)
         if ('serviceWorker' in navigator) {
@@ -143,6 +143,7 @@
                         <!-- 动态生成菜品编辑标签 -->
                     </div>
                     <button id="btn-reset-default-dishes" class="btn btn-secondary" onclick="resetToPaperMenuDishes()" style="margin-top: 12px; font-size: 0.85rem; width: 100%;">🔄 一键恢复为最新手写纸质菜单</button>
+                    <button id="btn-force-purge-cache" class="btn btn-danger" onclick="forcePurgeCache()" style="margin-top: 8px; font-size: 0.85rem; width: 100%; font-weight: bold;">⚡ 强制清除旧版手机缓存 (升级最新排版)</button>
                 </div>
             </div>
 
