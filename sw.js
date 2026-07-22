@@ -1,5 +1,5 @@
 // 烧烤联机助手 Service Worker - 离线缓存支持
-const CACHE_NAME = 'bbq-helper-v11';
+const CACHE_NAME = 'bbq-helper-v12';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',

@@ -908,20 +908,24 @@ function renderHistoryList() {
 
 // 渲染设置面板中的菜品列表和标签列表
 function renderSettingsEditor() {
-    // 1. 菜品管理
+    // 1. 菜品内联管理 (无需弹窗，在页面上直接点击文本框即可修改名字与价格)
     const dishContainer = document.getElementById('dish-list-edit');
     if (dishContainer) {
         dishContainer.innerHTML = '';
         state.dishes.forEach((dish, idx) => {
             const item = document.createElement('div');
-            item.className = 'tag-edit-item';
-            item.style.cursor = 'pointer';
-            item.title = '点击修改名称或价格';
-            item.setAttribute('onclick', `window.openEditDishModal(${idx})`);
+            item.className = 'inline-dish-row';
+            item.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px; background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);';
+            
             const priceVal = typeof dish.price === 'number' ? dish.price : 0;
             item.innerHTML = `
-                <span>✏️ ${dish.name} (￥${priceVal.toFixed(1)}元)</span>
-                <button class="btn-remove" onclick="event.stopPropagation(); removeDish(${idx})" title="删除菜品">&times;</button>
+                <span style="font-size: 0.85rem; color: var(--text-muted); width: 22px; text-align: right;">${idx + 1}.</span>
+                <input type="text" value="${dish.name}" onchange="window.updateDishNameInline(${idx}, this.value)" class="search-input" style="flex: 2.2; padding: 8px 10px; font-size: 0.95rem; border-radius: 6px; border: 1.5px solid #444;" placeholder="菜品名称">
+                <div style="display: flex; align-items: center; gap: 3px; flex: 1.3; min-width: 85px;">
+                    <span style="color: #ffd600; font-weight: bold; font-size: 0.9rem;">￥</span>
+                    <input type="number" step="0.5" value="${priceVal}" onchange="window.updateDishPriceInline(${idx}, this.value)" class="search-input" style="padding: 8px 6px; font-size: 0.95rem; border-radius: 6px; border: 1.5px solid #444; width: 100%;" placeholder="单价">
+                </div>
+                <button type="button" class="btn btn-danger" onclick="removeDish(${idx})" style="padding: 8px 10px; font-size: 0.8rem; border-radius: 6px; white-space: nowrap;" title="删除菜品">✕ 删除</button>
             `;
             dishContainer.appendChild(item);
         });
@@ -2062,6 +2066,26 @@ window.forcePurgeCache = function() {
     } else {
         window.location.href = window.location.origin + window.location.pathname + '?t=' + Date.now();
     }
+};
+
+window.updateDishNameInline = function(idx, newName) {
+    if (idx < 0 || idx >= state.dishes.length) return;
+    const name = newName.trim();
+    if (!name) return;
+    state.dishes[idx].name = name;
+    saveToLocalStorage();
+    broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } });
+    renderQuickDishesGrid();
+};
+
+window.updateDishPriceInline = function(idx, newPriceStr) {
+    if (idx < 0 || idx >= state.dishes.length) return;
+    const price = parseFloat(newPriceStr);
+    if (isNaN(price) || price < 0) return;
+    state.dishes[idx].price = price;
+    saveToLocalStorage();
+    broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } });
+    renderQuickDishesGrid();
 };
 
 

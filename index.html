@@ -13,8 +13,8 @@
     <!-- 引入 MQTT.js 用于公网/局域网跨网同步 (双CDN备选) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <script>if(typeof mqtt==='undefined'){document.write('<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"><\/script>')}</script>
-    <script src="app.js?v=44" defer></script>
-    <link rel="stylesheet" href="style.css?v=20">
+    <script src="app.js?v=45" defer></script>
+    <link rel="stylesheet" href="style.css?v=21">
     <script>
         // 注册 Service Worker (PWA 离线支持)
         if ('serviceWorker' in navigator) {
@@ -138,7 +138,7 @@
                         <input type="number" id="input-new-dish-price" placeholder="价格 (元)，如: 12" step="0.5" style="flex: 1; min-width: 80px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: var(--text-color);">
                         <button id="btn-add-dish" class="btn btn-primary" style="flex: 1; min-width: 90px;">添加菜品</button>
                     </div>
-                    <p style="font-size: 0.85rem; color: #ffaa00; margin: 8px 0 4px 0;">💡 提示：点击任意菜品标签可弹出修改名字和价格，点击 ✕ 可删除。</p>
+                    <p style="font-size: 0.85rem; color: #ffaa00; margin: 8px 0 8px 0;">💡 提示：可以直接在下方输入框中修改菜品名称和单价（修改后自动实时保存），点击 ✕ 可删除。</p>
                     <div id="dish-list-edit" class="tag-edit-container">
                         <!-- 动态生成菜品编辑标签 -->
                     </div>
