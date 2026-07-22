@@ -1347,78 +1347,68 @@ window.closeModifyOrderModal = function() {
     editingOrderItems = {};
 };
 
-function renderModifyOrderItems() {
-    const container = document.getElementById('modify-order-items-container');
+function renderModifyDishesGrid(filterQuery = '') {
+    const container = document.getElementById('modify-dishes-grid');
     if (!container) return;
     container.innerHTML = '';
     
-    let total = 0;
-    const entries = Object.entries(editingOrderItems);
-    if (entries.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">暂无菜品或酒水</p>';
+    const filtered = state.dishes.filter(d => matchDishSearch(d.name, filterQuery));
+    
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 25px 10px; font-size: 0.95rem;">
+                🔍 没找到与 "${filterQuery}" 匹配的菜品或酒水
+            </div>
+        `;
     } else {
-        entries.forEach(([name, qty]) => {
-            const unitPrice = getDishPrice(name);
-            const itemTotal = unitPrice * qty;
-            total += itemTotal;
+        filtered.forEach(dish => {
+            const qty = editingOrderItems[dish.name] || 0;
+            const priceVal = typeof dish.price === 'number' ? dish.price : 0;
+            const catName = dishCategoryMap[dish.name] || '烧烤';
             
-            const row = document.createElement('div');
-            row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);';
-            row.innerHTML = `
-                <div style="flex: 1;">
-                    <span style="font-weight: bold; font-size: 0.95rem;">${name}</span>
-                    <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 6px;">(￥${unitPrice}/份)</span>
+            const card = document.createElement('div');
+            card.className = 'dish-counter-card' + (qty > 0 ? ' active' : '');
+            card.innerHTML = `
+                <div class="dish-card-header">
+                    <span class="dish-cat-badge">${catName}</span>
+                    <span class="dish-card-price">￥${priceVal.toFixed(1)}</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <button type="button" class="btn btn-secondary" onclick="updateModifyItemQty('${name}', -1)" style="padding: 4px 10px; font-weight: bold;">-</button>
-                    <span style="font-weight: bold; min-width: 20px; text-align: center; color: #ffd600;">${qty}</span>
-                    <button type="button" class="btn btn-secondary" onclick="updateModifyItemQty('${name}', 1)" style="padding: 4px 10px; font-weight: bold;">+</button>
+                <div class="dish-card-name">${dish.name}</div>
+                <div class="dish-card-controls">
+                    <button type="button" class="btn-dish-qty btn-minus" onclick="changeModifyDishQty('${dish.name}', -1)">-</button>
+                    <span class="dish-qty-val">${qty}</span>
+                    <button type="button" class="btn-dish-qty btn-plus" onclick="changeModifyDishQty('${dish.name}', 1)">+</button>
                 </div>
             `;
-            container.appendChild(row);
+            container.appendChild(card);
         });
     }
     
-    const badge = document.getElementById('modify-order-total-badge');
-    if (badge) badge.textContent = `合计: ￥${total.toFixed(2)}`;
+    // 计算并更新合计金额
+    updateModifyOrderTotalBadge();
 }
 
-window.updateModifyItemQty = function(name, change) {
-    if (!editingOrderItems[name]) return;
-    editingOrderItems[name] += change;
-    if (editingOrderItems[name] <= 0) {
-        delete editingOrderItems[name];
+window.changeModifyDishQty = function(dishName, delta) {
+    const current = editingOrderItems[dishName] || 0;
+    const next = current + delta;
+    if (next <= 0) {
+        delete editingOrderItems[dishName];
+    } else {
+        editingOrderItems[dishName] = next;
     }
-    renderModifyOrderItems();
+    const searchInput = document.getElementById('input-modify-dish-search');
+    const query = searchInput ? searchInput.value : '';
+    renderModifyDishesGrid(query);
 };
 
-window.addExtraDrinkToModify = function(drinkName, price) {
-    if (!state.dishes.some(d => d.name === drinkName)) {
-        state.dishes.push({ name: drinkName, price: price });
+function updateModifyOrderTotalBadge() {
+    let total = 0;
+    for (const [name, qty] of Object.entries(editingOrderItems)) {
+        total += getDishPrice(name) * qty;
     }
-    editingOrderItems[drinkName] = (editingOrderItems[drinkName] || 0) + 1;
-    renderModifyOrderItems();
-};
-
-window.addCustomExtraItemToModify = function() {
-    const nameInput = document.getElementById('input-extra-item-name');
-    const priceInput = document.getElementById('input-extra-item-price');
-    const name = nameInput ? nameInput.value.trim() : '';
-    const priceStr = priceInput ? priceInput.value.trim() : '';
-    const price = parseFloat(priceStr) || 0;
-    
-    if (!name) {
-        alert('请输入加菜/饮料名称！');
-        return;
-    }
-    if (!state.dishes.some(d => d.name === name)) {
-        state.dishes.push({ name: name, price: price });
-    }
-    editingOrderItems[name] = (editingOrderItems[name] || 0) + 1;
-    if (nameInput) nameInput.value = '';
-    if (priceInput) priceInput.value = '';
-    renderModifyOrderItems();
-};
+    const badge = document.getElementById('modify-order-total-badge');
+    if (badge) badge.textContent = `最新合计: ￥${total.toFixed(2)}`;
+}
 
 window.saveModifiedOrder = function() {
     if (!editingOrderId) return;
