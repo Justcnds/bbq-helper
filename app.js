@@ -857,7 +857,7 @@ function renderGrillingList() {
         
         card.innerHTML = `
             <!-- 右上角迷你取消订单按钮 -->
-            <button class="mini-delete-btn" data-step="1" onclick="event.stopPropagation(); deleteOrderStep(this, '${order.id}')" title="取消订单">🗑️</button>
+            <button class="mini-delete-btn" data-step="1" onclick="event.stopPropagation(); deleteOrderStep(this, '${order.id}', event)" ondblclick="event.stopPropagation(); event.preventDefault();" ontouchstart="event.stopPropagation();" title="取消订单">🗑️</button>
             
             <div class="order-card-header">
                 <span class="order-num">#${order.num}</span>
@@ -1315,8 +1315,10 @@ function renderQuickDishesGrid(filterQuery = '') {
         card.className = 'dish-counter-card' + (qty > 0 ? ' active' : '');
         card.id = `dish-card-${dish.name}`;
         card.innerHTML = `
-            <span class="dish-counter-name">${dish.name}</span>
-            <span class="dish-counter-price">￥${dish.price.toFixed(1)}元</span>
+            <div class="dish-counter-info">
+                <span class="dish-counter-name">${dish.name}</span>
+                <span class="dish-counter-price">￥${dish.price.toFixed(1)}元</span>
+            </div>
             <div class="dish-counter-controls">
                 <button type="button" class="btn-qty btn-qty-minus ${qty === 0 ? 'disabled' : ''}" onclick="changeDishQty('${dish.name}', -1)">-</button>
                 <span class="dish-qty-val" id="qty-val-${dish.name}">${qty}</span>
@@ -1384,8 +1386,10 @@ window.renderModifyDishesGrid = function(filterQuery = '') {
             const card = document.createElement('div');
             card.className = 'dish-counter-card' + (qty > 0 ? ' active' : '');
             card.innerHTML = `
-                <span class="dish-counter-name">${dish.name}</span>
-                <span class="dish-counter-price">￥${priceVal.toFixed(1)}元</span>
+                <div class="dish-counter-info">
+                    <span class="dish-counter-name">${dish.name}</span>
+                    <span class="dish-counter-price">￥${priceVal.toFixed(1)}元</span>
+                </div>
                 <div class="dish-counter-controls">
                     <button type="button" class="btn-qty btn-qty-minus ${qty === 0 ? 'disabled' : ''}" onclick="changeModifyDishQty('${dish.name}', -1)">-</button>
                     <span class="dish-qty-val">${qty}</span>
@@ -1422,7 +1426,13 @@ function updateModifyOrderTotalBadge() {
     if (badge) badge.textContent = `最新合计: ￥${total.toFixed(2)}`;
 }
 
-window.openModifyOrderModal = function(orderId) {
+window.openModifyOrderModal = function(orderId, event) {
+    if (event) {
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        if (event.target && (event.target.classList.contains('mini-delete-btn') || event.target.closest('.mini-delete-btn'))) {
+            return; // 点击来自垃圾桶，不打开修改弹窗
+        }
+    }
     const order = state.orders.find(o => o.id === orderId);
     if (!order) return;
     editingOrderId = orderId;
@@ -1703,7 +1713,11 @@ window.completeOrder = function(orderId) {
 };
 
 // 3次确认取消/删除订单逻辑 (仅变色，不改字，无中途音效，仅最后一下播放声音，且3秒不操作自动复原)
-window.deleteOrderStep = function(btn, orderId) {
+window.deleteOrderStep = function(btn, orderId, event) {
+    if (event) {
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+    }
     let step = parseInt(btn.dataset.step);
     
     // 清除上一次的自动复原定时器
