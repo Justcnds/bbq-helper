@@ -925,47 +925,50 @@ input:checked + .slider:before {
 }
 
 .dish-counter-card {
-    background: linear-gradient(135deg, rgba(40, 40, 50, 0.7) 0%, rgba(25, 25, 32, 0.85) 100%);
-    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, rgba(40, 40, 50, 0.75) 0%, rgba(25, 25, 32, 0.9) 100%);
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
     border-radius: 12px;
-    padding: 10px 12px;
+    padding: 12px 14px !important;
+    min-height: 52px !important;
     display: flex;
     align-items: center;
     justify-content: space-between;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
     width: 100% !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
-    gap: 8px;
+    gap: 10px;
+    margin-bottom: 2px;
 }
 
 .dish-counter-info {
     flex: 1;
     min-width: 0;
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
     overflow: hidden;
-    margin-right: 6px;
 }
 
 .dish-counter-name {
-    font-size: 1rem;
+    font-size: 1.05rem !important;
     font-weight: 800;
+    line-height: 1.4 !important;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    width: 100%;
-    color: #f5f5f5;
+    color: #ffffff;
     text-align: left;
 }
 
 .dish-counter-price {
-    font-size: 0.82rem;
-    color: var(--primary);
-    font-weight: 700;
-    margin-top: 2px;
+    font-size: 0.9rem !important;
+    color: #ffd600 !important;
+    font-weight: 800;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .dish-counter-controls {
@@ -1822,11 +1825,12 @@ input:checked + .slider:before {
     }
     
     .dish-counter-card {
-        padding: 8px 10px !important;
+        padding: 10px 12px !important;
+        min-height: 48px !important;
         flex-direction: row !important;
         justify-content: space-between !important;
         align-items: center !important;
-        gap: 6px !important;
+        gap: 8px !important;
         text-align: left !important;
         width: 100% !important;
         box-sizing: border-box !important;
@@ -1836,11 +1840,16 @@ input:checked + .slider:before {
     .dish-counter-info {
         flex: 1 !important;
         min-width: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 6px !important;
         overflow: hidden !important;
     }
     
     .dish-counter-name {
-        font-size: 0.92rem !important;
+        font-size: 0.98rem !important;
+        line-height: 1.35 !important;
         margin-right: 0 !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;

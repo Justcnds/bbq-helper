@@ -1317,7 +1317,7 @@ function renderQuickDishesGrid(filterQuery = '') {
         card.innerHTML = `
             <div class="dish-counter-info">
                 <span class="dish-counter-name">${dish.name}</span>
-                <span class="dish-counter-price">￥${dish.price.toFixed(1)}元</span>
+                <span class="dish-counter-price">￥${dish.price.toFixed(1)}</span>
             </div>
             <div class="dish-counter-controls">
                 <button type="button" class="btn-qty btn-qty-minus ${qty === 0 ? 'disabled' : ''}" onclick="changeDishQty('${dish.name}', -1)">-</button>
@@ -1388,7 +1388,7 @@ window.renderModifyDishesGrid = function(filterQuery = '') {
             card.innerHTML = `
                 <div class="dish-counter-info">
                     <span class="dish-counter-name">${dish.name}</span>
-                    <span class="dish-counter-price">￥${priceVal.toFixed(1)}元</span>
+                    <span class="dish-counter-price">￥${priceVal.toFixed(1)}</span>
                 </div>
                 <div class="dish-counter-controls">
                     <button type="button" class="btn-qty btn-qty-minus ${qty === 0 ? 'disabled' : ''}" onclick="changeModifyDishQty('${dish.name}', -1)">-</button>
