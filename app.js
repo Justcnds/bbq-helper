@@ -398,24 +398,65 @@ function loadFromCloud() {
         })
         .then(data => {
             if (data) {
-                state.orders = data.orders || [];
-                state.history = data.history || [];
-                state.dishes = data.dishes || [...DEFAULT_DISHES];
-                state.tags = data.tags || [...DEFAULT_TAGS];
-                state.lastOrderNum = data.lastOrderNum || 0;
+                // 1. 增量合并订单：绝不粗暴覆盖本地订单
+                if (data.orders && Array.isArray(data.orders)) {
+                    data.orders.forEach(remoteOrder => {
+                        const localOrder = state.orders.find(o => o.id === remoteOrder.id);
+                        if (!localOrder) {
+                            state.orders.push(remoteOrder);
+                        } else {
+                            if (remoteOrder.isPaid) localOrder.isPaid = true;
+                            if (remoteOrder.items) localOrder.items = remoteOrder.items;
+                        }
+                    });
+                }
                 
-                // 保存并刷新
+                // 2. 增量合并历史记录
+                if (data.history && Array.isArray(data.history)) {
+                    data.history.forEach(h => {
+                        if (!state.history.some(localH => localH.id === h.id)) {
+                            state.history.push(h);
+                        }
+                    });
+                }
+
+                // 3. 菜品设置智能合并：如果本地菜品已经自定义增加/修改过，保护本地修改，合并新增菜品
+                if (data.dishes && Array.isArray(data.dishes) && data.dishes.length > 0) {
+                    data.dishes.forEach(d => {
+                        const localDish = state.dishes.find(ld => ld.name === d.name);
+                        if (!localDish) {
+                            state.dishes.push(d);
+                        } else {
+                            if (typeof d.price === 'number' && d.price > 0 && localDish.price === undefined) {
+                                localDish.price = d.price;
+                            }
+                        }
+                    });
+                }
+                
+                if (data.tags && Array.isArray(data.tags)) {
+                    data.tags.forEach(t => {
+                        if (!state.tags.includes(t)) state.tags.push(t);
+                    });
+                }
+                
+                if (data.lastOrderNum !== undefined) {
+                    state.lastOrderNum = Math.max(state.lastOrderNum || 0, data.lastOrderNum || 0);
+                }
+                
+                // 保存合并后的最新数据到本地并回传保存
                 localStorage.setItem('bbq_helper_state', JSON.stringify(state));
                 renderGrillingList();
                 renderHistoryList();
                 renderSettingsEditor();
-                console.log('成功从云端数据库拉取并更新数据！');
+                renderQuickDishesGrid();
+                console.log('成功同步并安全合并云端数据库！');
                 return true;
             }
             return false;
         })
         .catch(err => {
-            console.warn('读取云数据库失败，使用本地缓存:', err);
+            console.warn('读取云数据库失败，保留并使用本地存储:', err);
             return false;
         });
 }
@@ -628,11 +669,36 @@ function handleSyncMessage(msg) {
             break;
             
         case 'SYNC_STATE':
-            // 收到其他设备的最新状态
-            if (msg.dishes && msg.dishes.length > 0) state.dishes = msg.dishes;
-            if (msg.tags && msg.tags.length > 0) state.tags = msg.tags;
-            if (msg.orders && msg.orders.length > 0) state.orders = msg.orders;
-            if (msg.lastOrderNum !== undefined) state.lastOrderNum = msg.lastOrderNum;
+            // 收到其他设备的最新状态，安全增量合并
+            if (msg.dishes && Array.isArray(msg.dishes) && msg.dishes.length > 0) {
+                msg.dishes.forEach(d => {
+                    const localDish = state.dishes.find(ld => ld.name === d.name);
+                    if (!localDish) {
+                        state.dishes.push(d);
+                    } else if (typeof d.price === 'number') {
+                        localDish.price = d.price;
+                    }
+                });
+            }
+            if (msg.tags && Array.isArray(msg.tags) && msg.tags.length > 0) {
+                msg.tags.forEach(t => {
+                    if (!state.tags.includes(t)) state.tags.push(t);
+                });
+            }
+            if (msg.orders && Array.isArray(msg.orders)) {
+                msg.orders.forEach(remoteOrder => {
+                    const localOrder = state.orders.find(o => o.id === remoteOrder.id);
+                    if (!localOrder) {
+                        state.orders.push(remoteOrder);
+                    } else {
+                        if (remoteOrder.isPaid) localOrder.isPaid = true;
+                        if (remoteOrder.items) localOrder.items = remoteOrder.items;
+                    }
+                });
+            }
+            if (msg.lastOrderNum !== undefined) {
+                state.lastOrderNum = Math.max(state.lastOrderNum || 0, msg.lastOrderNum);
+            }
             saveToLocalStorage();
             renderGrillingList();
             renderSettingsEditor();
@@ -705,9 +771,14 @@ function renderGrillingList() {
     const listContainer = document.getElementById('grilling-list');
     const countBadge = document.getElementById('grilling-count');
     
-    // 过滤当前营业日内的订单 (16:00 到次日 04:00 算同一天)
+    // 【正在烤】逻辑：
+    // 1. 所有尚未付款的订单（无论何时下单，未付款绝不隐藏！）
+    // 2. 本营业日内（16:00 到次日 04:00）已确认付款的订单（保留绿框高亮展示）
     const todayBizDay = getBBQBusinessDay(Date.now());
-    const activeOrders = state.orders.filter(order => getBBQBusinessDay(order.timestamp) === todayBizDay);
+    const activeOrders = state.orders.filter(order => {
+        if (!order.isPaid) return true; // 未付款的订单永远不隐藏，确保绝不丢失！
+        return getBBQBusinessDay(order.timestamp) === todayBizDay; // 已付款订单在本营业日内保留展示
+    });
     
     countBadge.textContent = activeOrders.length;
     
