@@ -1385,6 +1385,7 @@ window.renderModifyDishesGrid = function(filterQuery = '') {
             
             const card = document.createElement('div');
             card.className = 'dish-counter-card' + (qty > 0 ? ' active' : '');
+            card.id = 'modify-dish-card-' + dish.name;
             card.innerHTML = `
                 <div class="dish-counter-info">
                     <div class="dish-counter-name">${dish.name}</div>
@@ -1406,15 +1407,29 @@ window.renderModifyDishesGrid = function(filterQuery = '') {
 
 window.changeModifyDishQty = function(dishName, delta) {
     const current = editingOrderItems[dishName] || 0;
-    const next = current + delta;
+    const next = Math.max(0, current + delta);
     if (next <= 0) {
         delete editingOrderItems[dishName];
     } else {
         editingOrderItems[dishName] = next;
     }
-    const searchInput = document.getElementById('input-modify-dish-search');
-    const query = searchInput ? searchInput.value : '';
-    window.renderModifyDishesGrid(query);
+    
+    // 局部精确更新卡片 UI，绝不重新渲染整个列表，保持滚动条与手指位置绝对不动！
+    const card = document.getElementById('modify-dish-card-' + dishName);
+    if (card) {
+        const qtyValSpan = card.querySelector('.dish-qty-val');
+        const minusBtn = card.querySelector('.btn-qty-minus');
+        if (next === 0) {
+            card.classList.remove('active');
+            if (minusBtn) minusBtn.classList.add('disabled');
+        } else {
+            card.classList.add('active');
+            if (minusBtn) minusBtn.classList.remove('disabled');
+        }
+        if (qtyValSpan) qtyValSpan.textContent = next;
+    }
+    
+    updateModifyOrderTotalBadge();
 };
 
 function updateModifyOrderTotalBadge() {
