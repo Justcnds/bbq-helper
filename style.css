@@ -976,6 +976,8 @@ input:checked + .slider:before {
     font-weight: 800 !important;
     text-align: left !important;
     margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
 }
 
 .dish-counter-controls {
@@ -1474,11 +1476,14 @@ input:checked + .slider:before {
 }
 
 .dish-counter-price {
-    font-size: 0.95rem;
-    color: var(--primary);
-    font-weight: bold;
-    margin-left: auto;
-    margin-right: 16px;
+    font-size: 0.88rem !important;
+    color: #ffd600 !important;
+    font-weight: bold !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    text-align: left !important;
+    display: block !important;
+    width: 100% !important;
 }
 
 /* mini avatar scale down for order card */
