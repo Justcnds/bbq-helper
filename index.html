@@ -16,8 +16,8 @@
     <!-- 引入 MQTT.js 用于公网/局域网跨网同步 (双CDN备选) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <script>if(typeof mqtt==='undefined'){document.write('<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"><\/script>')}</script>
-    <script src="app.js?v=60" defer></script>
-    <link rel="stylesheet" href="style.css?v=36">
+    <script src="app.js?v=61" defer></script>
+    <link rel="stylesheet" href="style.css?v=37">
     <script>
         // 自动清理 Service Worker 旧离线缓存，确保浏览器永远拉取最新 GitHub 代码
         if ('serviceWorker' in navigator) {
@@ -327,7 +327,7 @@
 
                 <!-- 菜品/酒水网格选择区 (和点单列表逻辑完全一致) -->
                 <div style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted); margin-bottom: 2px;">菜品/酒水选择网格 (点击 - / + 加减)：</div>
-                <div id="modify-dishes-grid" class="dishes-grid" style="grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 42vh; overflow-y: auto; padding: 4px;">
+                <div id="modify-dishes-grid" class="dishes-grid" style="grid-template-columns: 1fr; gap: 8px; max-height: 45vh; overflow-y: auto; padding: 4px; width: 100%; box-sizing: border-box;">
                     <!-- 动态生成加减菜品网格 -->
                 </div>
 
