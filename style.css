@@ -999,6 +999,10 @@ input:checked + .slider:before {
     justify-content: center;
     cursor: pointer;
     transition: all 0.15s ease;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
 }
 
 .btn-qty-minus {

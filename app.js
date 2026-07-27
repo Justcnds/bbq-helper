@@ -1392,9 +1392,9 @@ window.renderModifyDishesGrid = function(filterQuery = '') {
                     <div class="dish-counter-price">￥${priceVal.toFixed(1)}/份</div>
                 </div>
                 <div class="dish-counter-controls">
-                    <button type="button" class="btn-qty btn-qty-minus ${qty === 0 ? 'disabled' : ''}" onclick="changeModifyDishQty('${dish.name}', -1)">-</button>
+                    <button type="button" class="btn-qty btn-qty-minus ${qty === 0 ? 'disabled' : ''}" onmousedown="event.preventDefault()" onclick="changeModifyDishQty('${dish.name}', -1, event)">-</button>
                     <span class="dish-qty-val">${qty}</span>
-                    <button type="button" class="btn-qty btn-qty-plus" onclick="changeModifyDishQty('${dish.name}', 1)">+</button>
+                    <button type="button" class="btn-qty btn-qty-plus" onmousedown="event.preventDefault()" onclick="changeModifyDishQty('${dish.name}', 1, event)">+</button>
                 </div>
             `;
             container.appendChild(card);
@@ -1405,7 +1405,15 @@ window.renderModifyDishesGrid = function(filterQuery = '') {
     updateModifyOrderTotalBadge();
 };
 
-window.changeModifyDishQty = function(dishName, delta) {
+window.changeModifyDishQty = function(dishName, delta, event) {
+    if (event) {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
+    
+    const container = document.getElementById('modify-dishes-grid');
+    const lockedScrollTop = container ? container.scrollTop : 0;
+
     const current = editingOrderItems[dishName] || 0;
     const next = Math.max(0, current + delta);
     if (next <= 0) {
@@ -1430,6 +1438,11 @@ window.changeModifyDishQty = function(dishName, delta) {
     }
     
     updateModifyOrderTotalBadge();
+
+    // 强行锁死并保持滑动条位置原封不动，防止移动端 iOS/Android 触发 scrollIntoView 原生漂移
+    if (container) {
+        container.scrollTop = lockedScrollTop;
+    }
 };
 
 function updateModifyOrderTotalBadge() {
