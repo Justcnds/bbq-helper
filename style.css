@@ -1785,6 +1785,7 @@ input:checked + .slider:before {
     
     .order-card-header {
         margin-bottom: 8px !important;
+        padding-right: 36px !important;
     }
     
     .order-num {

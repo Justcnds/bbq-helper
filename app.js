@@ -896,12 +896,14 @@ function renderGrillingList() {
             : `<span class="order-price-badge">￥${orderTotal.toFixed(2)}</span>`;
             
         const footerHtml = isPaid
-            ? `<div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0, 230, 118, 0.12); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(0, 230, 118, 0.3); width: 100%;">
-                <span style="color: #00e676; font-weight: bold; font-size: 0.9rem;">✅ 已付款 (双击卡片加菜/加酒)</span>
-                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 4px 10px; font-size: 0.8rem; width: auto !important;">✏️ 改单加菜</button>
+            ? `<div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0, 230, 118, 0.12); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(0, 230, 118, 0.3); width: 100%; gap: 6px;">
+                <span style="color: #00e676; font-weight: bold; font-size: 0.85rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">✅ 已付款</span>
+                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 4px 8px; font-size: 0.8rem; width: auto !important;">✏️ 改单</button>
+                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openMergeOrderModal('${order.id}', event)" style="padding: 4px 8px; font-size: 0.8rem; width: auto !important; color: #ffd600; border-color: rgba(255, 214, 0, 0.4); background: rgba(255, 214, 0, 0.12);" title="合并其他订单到此单">🔗 并单</button>
                </div>`
-            : `<div style="display: flex; align-items: center; gap: 8px; width: 100%;">
-                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 0 14px; height: 46px; font-size: 0.85rem; font-weight: bold; border-radius: 23px; flex-shrink: 0; width: auto !important; white-space: nowrap;" title="修改订单/加菜">✏️ 改单加菜</button>
+            : `<div style="display: flex; align-items: center; gap: 6px; width: 100%;">
+                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 0 10px; height: 46px; font-size: 0.85rem; font-weight: bold; border-radius: 23px; flex-shrink: 0; width: auto !important; white-space: nowrap;" title="修改订单/加菜">✏️ 改单</button>
+                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openMergeOrderModal('${order.id}', event)" style="padding: 0 10px; height: 46px; font-size: 0.85rem; font-weight: bold; border-radius: 23px; flex-shrink: 0; width: auto !important; white-space: nowrap; color: #ffd600; border-color: rgba(255, 214, 0, 0.4); background: rgba(255, 214, 0, 0.12);" title="合并其他订单到此单">🔗 并单</button>
                 <div class="slide-confirm-container" style="flex: 1; min-width: 0;">
                     <span class="slide-confirm-text">👉 右滑确认付款</span>
                     <input type="range" class="slide-confirm-range" min="0" max="100" value="0" onmousedown="handleSliderStart(event)" ontouchstart="handleSliderStart(event)" oninput="handleSlideConfirm(this, '${order.id}')" onchange="resetSlideConfirm(this)">
@@ -909,11 +911,8 @@ function renderGrillingList() {
                </div>`;
         
         card.innerHTML = `
-            <!-- 右上角快捷操作区：并单与取消 -->
-            <div class="order-card-actions" style="position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 6px; z-index: 10;">
-                <button type="button" class="mini-merge-btn" onclick="event.stopPropagation(); window.openMergeOrderModal('${order.id}', event)" ondblclick="event.stopPropagation(); event.preventDefault();" ontouchstart="event.stopPropagation();" title="合并其他订单到此单">🔗 并单</button>
-                <button type="button" class="mini-delete-btn" data-step="1" onclick="event.stopPropagation(); deleteOrderStep(this, '${order.id}', event)" ondblclick="event.stopPropagation(); event.preventDefault();" ontouchstart="event.stopPropagation();" title="取消订单">🗑️</button>
-            </div>
+            <!-- 右上角迷你取消订单按钮 -->
+            <button type="button" class="mini-delete-btn" data-step="1" onclick="event.stopPropagation(); deleteOrderStep(this, '${order.id}', event)" ondblclick="event.stopPropagation(); event.preventDefault();" ontouchstart="event.stopPropagation();" title="取消订单">🗑️</button>
             
             <div class="order-card-header">
                 <span class="order-num">#${order.num}</span>
