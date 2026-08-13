@@ -847,9 +847,8 @@ function renderGrillingList() {
                 <span style="color: #00e676; font-weight: bold; font-size: 0.9rem;">✅ 已付款 (双击卡片加菜/加酒)</span>
                 <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 4px 10px; font-size: 0.8rem; width: auto !important;">✏️ 改单加菜</button>
                </div>`
-            : `<div style="display: flex; align-items: center; gap: 6px; width: 100%;">
-                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 0 10px; height: 44px; font-size: 0.82rem; font-weight: bold; border-radius: 22px; flex-shrink: 0; width: auto !important; white-space: nowrap;" title="修改订单/加菜">✏️ 改单</button>
-                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openMergeOrderModal('${order.id}')" style="padding: 0 10px; height: 44px; font-size: 0.82rem; font-weight: bold; border-radius: 22px; flex-shrink: 0; width: auto !important; white-space: nowrap; color: #ffd600; border-color: rgba(255,214,0,0.4);" title="拼单/合并订单">🔗 拼单</button>
+            : `<div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 0 14px; height: 46px; font-size: 0.85rem; font-weight: bold; border-radius: 23px; flex-shrink: 0; width: auto !important; white-space: nowrap;" title="修改订单/加菜">✏️ 改单加菜</button>
                 <div class="slide-confirm-container" style="flex: 1; min-width: 0;">
                     <span class="slide-confirm-text">👉 右滑确认付款</span>
                     <input type="range" class="slide-confirm-range" min="0" max="100" value="0" onmousedown="handleSliderStart(event)" ontouchstart="handleSliderStart(event)" oninput="handleSlideConfirm(this, '${order.id}')" onchange="resetSlideConfirm(this)">
@@ -857,8 +856,11 @@ function renderGrillingList() {
                </div>`;
         
         card.innerHTML = `
-            <!-- 右上角迷你取消订单按钮 -->
-            <button class="mini-delete-btn" data-step="1" onclick="event.stopPropagation(); deleteOrderStep(this, '${order.id}', event)" ondblclick="event.stopPropagation(); event.preventDefault();" ontouchstart="event.stopPropagation();" title="取消订单">🗑️</button>
+            <!-- 右上角快捷操作区：并单与取消 -->
+            <div class="order-card-actions" style="position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 6px; z-index: 10;">
+                <button type="button" class="mini-merge-btn" onclick="event.stopPropagation(); window.openMergeOrderModal('${order.id}', event)" ondblclick="event.stopPropagation(); event.preventDefault();" ontouchstart="event.stopPropagation();" title="合并其他订单到此单">🔗 并单</button>
+                <button type="button" class="mini-delete-btn" data-step="1" onclick="event.stopPropagation(); deleteOrderStep(this, '${order.id}', event)" ondblclick="event.stopPropagation(); event.preventDefault();" ontouchstart="event.stopPropagation();" title="取消订单">🗑️</button>
+            </div>
             
             <div class="order-card-header">
                 <span class="order-num">#${order.num}</span>
@@ -1540,6 +1542,170 @@ window.saveModifiedOrder = function() {
     renderHistoryList();
     closeModifyOrderModal();
     alert('订单已成功更新！实时消费金额已同步重新计算。');
+};
+
+// --- 合并订单 (并单) 逻辑 ---
+let currentMergeTargetId = null;
+
+window.openMergeOrderModal = function(targetOrderId, event) {
+    if (event) {
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+    }
+    const targetOrder = state.orders.find(o => o.id === targetOrderId);
+    if (!targetOrder) return;
+    currentMergeTargetId = targetOrderId;
+    
+    const titleEl = document.getElementById('merge-modal-title');
+    if (titleEl) {
+        titleEl.textContent = `🔗 合并到 #${targetOrder.num}号订单 (${targetOrder.tableNum || '1号桌'})`;
+    }
+    
+    // 渲染目标订单摘要
+    const targetSummaryEl = document.getElementById('merge-target-summary');
+    if (targetSummaryEl) {
+        let total = 0;
+        let dishesSummary = [];
+        for (const [name, qty] of Object.entries(targetOrder.items || {})) {
+            total += getDishPrice(name) * qty;
+            dishesSummary.push(`${name}×${qty}`);
+        }
+        targetSummaryEl.innerHTML = `
+            <div style="font-weight: bold; color: #ffd600; margin-bottom: 4px; font-size: 0.95rem;">📌 当前主订单：#${targetOrder.num}号 (${targetOrder.tableNum || '1号桌'}) · 当前总计 ￥${total.toFixed(2)}</div>
+            <div style="font-size: 0.82rem; color: #bbb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${dishesSummary.join('、') || '暂无菜品'}">已点明细：${dishesSummary.join('、') || '暂无菜品'}</div>
+            ${targetOrder.customTag ? `<div style="font-size: 0.8rem; color: #ff9100; margin-top: 2px;">📌 原备注: ${targetOrder.customTag}</div>` : ''}
+        `;
+    }
+    
+    // 渲染其他可合并订单列表
+    const candidateListEl = document.getElementById('merge-candidate-list');
+    if (candidateListEl) {
+        const otherOrders = state.orders.filter(o => o.id !== targetOrderId && o.status !== 'deleted');
+        if (otherOrders.length === 0) {
+            candidateListEl.innerHTML = `
+                <div style="text-align: center; color: var(--text-muted); padding: 35px 10px; font-size: 0.95rem;">
+                    🍢 目前没有其他正在烤的订单可合并
+                </div>
+            `;
+        } else {
+            candidateListEl.innerHTML = '';
+            otherOrders.forEach(o => {
+                let otherTotal = 0;
+                let otherDishesSummary = [];
+                for (const [name, qty] of Object.entries(o.items || {})) {
+                    otherTotal += getDishPrice(name) * qty;
+                    otherDishesSummary.push(`${name}×${qty}`);
+                }
+                const card = document.createElement('div');
+                card.className = 'merge-candidate-card';
+                card.style.cssText = 'background: rgba(40,40,50,0.85); border: 1.5px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;';
+                card.innerHTML = `
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                            <span style="font-weight: bold; color: #ffffff; font-size: 0.95rem;">#${o.num}号单</span>
+                            <span style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: #ffd600; font-weight: bold;">${o.tableNum || '1号桌'}</span>
+                            <span style="font-weight: bold; color: #00e676; font-size: 0.9rem;">￥${otherTotal.toFixed(2)}</span>
+                            ${o.isPaid ? '<span style="font-size: 0.7rem; color: #00e676; border: 1px solid #00e676; border-radius: 4px; padding: 1px 4px; font-weight: bold;">已付款</span>' : ''}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${otherDishesSummary.join('、')}">
+                            ${otherDishesSummary.join('、')}
+                        </div>
+                        ${o.customTag ? `<div style="font-size: 0.75rem; color: #ff9100; margin-top: 2px;">📌 备注: ${o.customTag}</div>` : ''}
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="confirmMergeOrder('${o.id}')" style="padding: 8px 14px; font-size: 0.85rem; font-weight: bold; white-space: nowrap; flex-shrink: 0; background: linear-gradient(135deg, #ffd600 0%, #ffab00 100%); color: #111; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(255,214,0,0.3);">
+                        ➕ 并入此单
+                    </button>
+                `;
+                candidateListEl.appendChild(card);
+            });
+        }
+    }
+    
+    const modal = document.getElementById('merge-order-modal');
+    if (modal) modal.style.display = 'flex';
+};
+
+window.closeMergeOrderModal = function() {
+    const modal = document.getElementById('merge-order-modal');
+    if (modal) modal.style.display = 'none';
+    currentMergeTargetId = null;
+};
+
+window.confirmMergeOrder = function(sourceOrderId) {
+    if (!currentMergeTargetId || !sourceOrderId) return;
+    const targetOrder = state.orders.find(o => o.id === currentMergeTargetId);
+    const sourceOrderIdx = state.orders.findIndex(o => o.id === sourceOrderId);
+    if (!targetOrder || sourceOrderIdx === -1) return;
+    
+    const sourceOrder = state.orders[sourceOrderIdx];
+    
+    const isConfirmed = confirm(`确定将 #${sourceOrder.num}号单 (${sourceOrder.tableNum || '1号桌'}) 的菜品全部并入 #${targetOrder.num}号单 吗？\n合并后 #${sourceOrder.num}号单 将自动结转并入。`);
+    if (!isConfirmed) return;
+    
+    // 1. 菜品明细数量累加合并
+    targetOrder.items = targetOrder.items || {};
+    for (const [name, qty] of Object.entries(sourceOrder.items || {})) {
+        targetOrder.items[name] = (targetOrder.items[name] || 0) + qty;
+    }
+    
+    // 2. 备注合并
+    if (sourceOrder.customTag) {
+        if (targetOrder.customTag) {
+            targetOrder.customTag += `；${sourceOrder.customTag}`;
+        } else {
+            targetOrder.customTag = sourceOrder.customTag;
+        }
+    }
+    
+    // 3. 特殊要求去重合并
+    if (sourceOrder.reqs && Array.isArray(sourceOrder.reqs)) {
+        targetOrder.reqs = targetOrder.reqs || [];
+        sourceOrder.reqs.forEach(r => {
+            if (!targetOrder.reqs.includes(r)) targetOrder.reqs.push(r);
+        });
+    }
+    
+    // 4. 将被合并的订单从正在烤中移除，并放入历史记录中备份
+    state.orders.splice(sourceOrderIdx, 1);
+    sourceOrder.status = 'merged';
+    sourceOrder.mergedInto = targetOrder.id;
+    if (!state.history.some(h => h.id === sourceOrder.id)) {
+        state.history.unshift(JSON.parse(JSON.stringify(sourceOrder)));
+    }
+    
+    // 5. 语音/音效播报
+    speakText(`${sourceOrder.num}号订单已成功并入${targetOrder.num}号订单`);
+    
+    // 6. 保存与多端持久化广播
+    saveToLocalStorage();
+    renderGrillingList();
+    renderHistoryList();
+    
+    broadcastMsg({
+        type: 'DELETE_ORDER',
+        orderId: sourceOrderId
+    });
+    
+    broadcastMsg({
+        type: 'SYNC_STATE',
+        orders: state.orders,
+        history: state.history,
+        lastOrderNum: state.lastOrderNum,
+        dishes: state.dishes,
+        tags: state.tags
+    }, true);
+    
+    window.closeMergeOrderModal();
+    
+    // 如果修改订单弹窗正好开着当前单，同步刷新修改弹窗内容与总价
+    if (editingOrderId === targetOrder.id) {
+        editingOrderItems = JSON.parse(JSON.stringify(targetOrder.items || {}));
+        const remarkInput = document.getElementById('input-modify-order-remark');
+        if (remarkInput) remarkInput.value = targetOrder.customTag || '';
+        window.renderModifyDishesGrid();
+    }
+    
+    alert(`✅ 已成功将 #${sourceOrder.num}号单 合并入 #${targetOrder.num}号订单！`);
 };
 
 // 价格计算助手函数
@@ -2422,199 +2588,6 @@ window.updateDishPriceInline = function(idx, newPriceStr) {
     saveToLocalStorage();
     broadcastMsg({ type: 'UPDATE_STATE', state: { dishes: state.dishes } }, true);
     renderQuickDishesGrid();
-};
-
-// --- 订单合并 / 拼单处理逻辑 ---
-window.openMergeOrderModal = function(presetTargetId = null) {
-    const unpaidOrders = state.orders.filter(o => !o.isPaid);
-    
-    if (unpaidOrders.length < 2) {
-        alert('目前【正在烤】中未付款订单少于 2 笔，无需进行拼单合并！');
-        return;
-    }
-    
-    const targetSelect = document.getElementById('select-merge-target-order');
-    if (!targetSelect) return;
-    
-    targetSelect.innerHTML = '';
-    unpaidOrders.forEach(o => {
-        const option = document.createElement('option');
-        option.value = o.id;
-        const tableStr = o.tableNum || (o.tags && o.tags[0]) || '1号桌';
-        let total = 0;
-        for (const [name, qty] of Object.entries(o.items || {})) {
-            total += getDishPrice(name) * qty;
-        }
-        const itemCount = Object.values(o.items || {}).reduce((a,b)=>a+b, 0);
-        option.textContent = `#${o.num}号单 (${tableStr}) - 共${itemCount}件菜品 ￥${total.toFixed(2)}`;
-        targetSelect.appendChild(option);
-    });
-    
-    if (presetTargetId && unpaidOrders.some(o => o.id === presetTargetId)) {
-        targetSelect.value = presetTargetId;
-    }
-    
-    window.renderMergeSourceOrdersList();
-    
-    const modal = document.getElementById('merge-orders-modal');
-    if (modal) modal.style.display = 'flex';
-};
-
-window.closeMergeOrderModal = function() {
-    const modal = document.getElementById('merge-orders-modal');
-    if (modal) modal.style.display = 'none';
-};
-
-window.renderMergeSourceOrdersList = function() {
-    const targetSelect = document.getElementById('select-merge-target-order');
-    const sourceContainer = document.getElementById('merge-source-orders-list');
-    const summaryBox = document.getElementById('merge-preview-summary');
-    if (!targetSelect || !sourceContainer) return;
-    
-    const targetId = targetSelect.value;
-    sourceContainer.innerHTML = '';
-    
-    const candidateOrders = state.orders.filter(o => !o.isPaid && o.id !== targetId);
-    
-    if (candidateOrders.length === 0) {
-        sourceContainer.innerHTML = `<div style="color: var(--text-muted); padding: 10px; text-align: center;">无其他可并入的未付款订单</div>`;
-        if (summaryBox) summaryBox.style.display = 'none';
-        return;
-    }
-    
-    candidateOrders.forEach(o => {
-        const tableStr = o.tableNum || (o.tags && o.tags[0]) || '1号桌';
-        let total = 0;
-        for (const [name, qty] of Object.entries(o.items || {})) {
-            total += getDishPrice(name) * qty;
-        }
-        const itemCount = Object.values(o.items || {}).reduce((a,b)=>a+b, 0);
-        
-        const card = document.createElement('label');
-        card.style.cssText = `display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.04); padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; user-select: none;`;
-        card.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <input type="checkbox" class="merge-src-checkbox" value="${o.id}" onchange="updateMergePreviewSummary()" style="width: 18px; height: 18px; accent-color: #00e676; cursor: pointer;">
-                <div>
-                    <div style="font-weight: bold; font-size: 0.98rem; color: #fff;">#${o.num}号单 (${tableStr})</div>
-                    <div style="font-size: 0.8rem; color: var(--text-muted);">${o.customTag ? '📌 ' + o.customTag + ' • ' : ''}包含 ${itemCount} 件菜品</div>
-                </div>
-            </div>
-            <span style="font-weight: bold; color: #ffd600;">￥${total.toFixed(2)}</span>
-        `;
-        sourceContainer.appendChild(card);
-    });
-    
-    window.updateMergePreviewSummary();
-};
-
-window.updateMergePreviewSummary = function() {
-    const targetSelect = document.getElementById('select-merge-target-order');
-    const summaryBox = document.getElementById('merge-preview-summary');
-    if (!targetSelect || !summaryBox) return;
-    
-    const targetId = targetSelect.value;
-    const targetOrder = state.orders.find(o => o.id === targetId);
-    if (!targetOrder) return;
-    
-    const checkboxes = document.querySelectorAll('.merge-src-checkbox:checked');
-    const selectedSrcIds = Array.from(checkboxes).map(cb => cb.value);
-    
-    if (selectedSrcIds.length === 0) {
-        summaryBox.style.display = 'none';
-        return;
-    }
-    
-    // 计算预计合并后的数据
-    const mergedItems = { ...(targetOrder.items || {}) };
-    let extraCount = 0;
-    
-    selectedSrcIds.forEach(id => {
-        const srcOrder = state.orders.find(o => o.id === id);
-        if (srcOrder) {
-            for (const [name, qty] of Object.entries(srcOrder.items || {})) {
-                mergedItems[name] = (mergedItems[name] || 0) + qty;
-                extraCount += qty;
-            }
-        }
-    });
-    
-    let mergedTotal = 0;
-    for (const [name, qty] of Object.entries(mergedItems)) {
-        mergedTotal += getDishPrice(name) * qty;
-    }
-    
-    summaryBox.style.display = 'block';
-    summaryBox.innerHTML = `
-        <div style="color: #00e676; font-weight: bold; margin-bottom: 4px;">✅ 已勾选 ${selectedSrcIds.length} 笔副订单 (+${extraCount}件菜品)</div>
-        <div>合并后 #${targetOrder.num}号单最新估算：<b>共 ${Object.values(mergedItems).reduce((a,b)=>a+b, 0)} 件菜品</b>，合计 <b style="color:#ffd600;">￥${mergedTotal.toFixed(2)}</b></div>
-    `;
-};
-
-window.confirmExecuteMergeOrders = function() {
-    const targetSelect = document.getElementById('select-merge-target-order');
-    if (!targetSelect) return;
-    const targetId = targetSelect.value;
-    const targetOrder = state.orders.find(o => o.id === targetId);
-    if (!targetOrder) {
-        alert('无法找到选中的主订单！');
-        return;
-    }
-    
-    const checkboxes = document.querySelectorAll('.merge-src-checkbox:checked');
-    const selectedSrcIds = Array.from(checkboxes).map(cb => cb.value);
-    
-    if (selectedSrcIds.length === 0) {
-        alert('请勾选至少 1 笔要合并进来的【副订单】！');
-        return;
-    }
-    
-    let mergedItemsCount = 0;
-    let mergedOrdersNums = [];
-    
-    selectedSrcIds.forEach(id => {
-        const srcIndex = state.orders.findIndex(o => o.id === id);
-        if (srcIndex !== -1) {
-            const srcOrder = state.orders[srcIndex];
-            mergedOrdersNums.push(`#${srcOrder.num}`);
-            
-            // 1. 合并菜品数量
-            for (const [name, qty] of Object.entries(srcOrder.items || {})) {
-                targetOrder.items[name] = (targetOrder.items[name] || 0) + qty;
-                mergedItemsCount += qty;
-            }
-            
-            // 2. 智能合并备注
-            if (srcOrder.customTag) {
-                if (targetOrder.customTag) {
-                    targetOrder.customTag += ` | ${srcOrder.customTag}`;
-                } else {
-                    targetOrder.customTag = srcOrder.customTag;
-                }
-            }
-            
-            // 3. 从未付款列表中安全移除已合并消单的副订单
-            state.orders.splice(srcIndex, 1);
-        }
-    });
-    
-    // 4. 持久化与重新渲染
-    saveToLocalStorage();
-    renderGrillingList();
-    renderHistoryList();
-    window.closeMergeOrderModal();
-    
-    // 5. 播报提示音与全端 MQTT 广播同步
-    announceOrder(targetOrder);
-    
-    broadcastMsg({
-        type: 'SYNC_STATE',
-        orders: state.orders,
-        history: state.history,
-        lastOrderNum: state.lastOrderNum,
-        dishes: state.dishes,
-        tags: state.tags
-    }, true);
 };
 
 
