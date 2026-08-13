@@ -76,6 +76,7 @@ let state = {
     roomId: '', // 默认未加入房间
     orders: [], // 正在烤 the orders
     history: [], // 今日已完成订单
+    deletedOrderIds: [], // 已删除/已合并订单黑名单 (防止多端同步复活)
     dishes: [...DEFAULT_DISHES],
     tags: [...DEFAULT_TAGS],
     audioEnabled: true,
@@ -367,6 +368,7 @@ function saveToCloud() {
     const payload = {
         orders: state.orders,
         history: state.history,
+        deletedOrderIds: state.deletedOrderIds || [],
         dishes: state.dishes,
         tags: state.tags,
         lastOrderNum: state.lastOrderNum
@@ -398,9 +400,24 @@ function loadFromCloud() {
         })
         .then(data => {
             if (data) {
-                // 1. 增量合并订单：绝不粗暴覆盖本地订单
+                // 0. 合并已删除/已合并黑名单
+                if (data.deletedOrderIds && Array.isArray(data.deletedOrderIds)) {
+                    state.deletedOrderIds = state.deletedOrderIds || [];
+                    data.deletedOrderIds.forEach(id => {
+                        if (!state.deletedOrderIds.includes(id)) state.deletedOrderIds.push(id);
+                        const idx = state.orders.findIndex(o => o.id === id);
+                        if (idx !== -1) state.orders.splice(idx, 1);
+                    });
+                    if (state.deletedOrderIds.length > 200) state.deletedOrderIds.splice(0, state.deletedOrderIds.length - 200);
+                }
+
+                // 1. 增量合并订单：严格过滤已删除/已合并订单
                 if (data.orders && Array.isArray(data.orders)) {
                     data.orders.forEach(remoteOrder => {
+                        const isDeleted = (state.deletedOrderIds && state.deletedOrderIds.includes(remoteOrder.id)) ||
+                                          (state.history && state.history.some(h => h.id === remoteOrder.id && (h.status === 'deleted' || h.status === 'merged')));
+                        if (isDeleted) return; // 坚决不复活已删除订单
+
                         const localOrder = state.orders.find(o => o.id === remoteOrder.id);
                         if (!localOrder) {
                             state.orders.push(remoteOrder);
@@ -502,6 +519,17 @@ function loadFromLocalStorage() {
                 state.dishes = [...DEFAULT_DISHES];
                 state.tags = [...DEFAULT_TAGS];
             }
+            // 确保已删除黑名单数组安全
+            state.deletedOrderIds = Array.isArray(state.deletedOrderIds) ? state.deletedOrderIds : [];
+            if (state.history && Array.isArray(state.history)) {
+                state.history.forEach(h => {
+                    if ((h.status === 'deleted' || h.status === 'merged') && !state.deletedOrderIds.includes(h.id)) {
+                        state.deletedOrderIds.push(h.id);
+                    }
+                });
+            }
+            if (state.deletedOrderIds.length > 200) state.deletedOrderIds.splice(0, state.deletedOrderIds.length - 200);
+
             // 确保安全
             if (!state.dishes || state.dishes.length === 0) state.dishes = [...DEFAULT_DISHES];
             if (!state.tags || state.tags.length === 0) state.tags = [...DEFAULT_TAGS];
@@ -662,6 +690,8 @@ function handleSyncMessage(msg) {
             broadcastMsg({
                 type: 'SYNC_STATE',
                 orders: state.orders,
+                history: state.history,
+                deletedOrderIds: state.deletedOrderIds || [],
                 lastOrderNum: state.lastOrderNum,
                 dishes: state.dishes,
                 tags: state.tags
@@ -670,6 +700,17 @@ function handleSyncMessage(msg) {
             
         case 'SYNC_STATE':
             // 收到其他设备的最新状态，安全增量合并
+            // 0. 合并已删除/已合并黑名单
+            if (msg.deletedOrderIds && Array.isArray(msg.deletedOrderIds)) {
+                state.deletedOrderIds = state.deletedOrderIds || [];
+                msg.deletedOrderIds.forEach(id => {
+                    if (!state.deletedOrderIds.includes(id)) state.deletedOrderIds.push(id);
+                    const idx = state.orders.findIndex(o => o.id === id);
+                    if (idx !== -1) state.orders.splice(idx, 1);
+                });
+                if (state.deletedOrderIds.length > 200) state.deletedOrderIds.splice(0, state.deletedOrderIds.length - 200);
+            }
+
             if (msg.dishes && Array.isArray(msg.dishes) && msg.dishes.length > 0) {
                 msg.dishes.forEach(d => {
                     const localDish = state.dishes.find(ld => ld.name === d.name);
@@ -687,6 +728,11 @@ function handleSyncMessage(msg) {
             }
             if (msg.orders && Array.isArray(msg.orders)) {
                 msg.orders.forEach(remoteOrder => {
+                    // 严格拦截：如果此单已经被删除或合并，坚决不加回来！
+                    const isDeleted = (state.deletedOrderIds && state.deletedOrderIds.includes(remoteOrder.id)) ||
+                                      (state.history && state.history.some(h => h.id === remoteOrder.id && (h.status === 'deleted' || h.status === 'merged')));
+                    if (isDeleted) return;
+
                     const localOrder = state.orders.find(o => o.id === remoteOrder.id);
                     if (!localOrder) {
                         state.orders.push(remoteOrder);
@@ -717,8 +763,10 @@ function handleSyncMessage(msg) {
             
         case 'ADD_ORDER':
             // 收到新订单广播
-            // 防止重复添加
-            if (!state.orders.some(o => o.id === msg.order.id)) {
+            // 防止重复添加或复活已被删除的订单
+            const isAddDeleted = (state.deletedOrderIds && state.deletedOrderIds.includes(msg.order.id)) ||
+                                 (state.history && state.history.some(h => h.id === msg.order.id && (h.status === 'deleted' || h.status === 'merged')));
+            if (!isAddDeleted && !state.orders.some(o => o.id === msg.order.id)) {
                 state.orders.push(msg.order);
                 state.lastOrderNum = Math.max(state.lastOrderNum, msg.order.num);
                 saveToLocalStorage();
@@ -747,6 +795,11 @@ function handleSyncMessage(msg) {
 
         case 'DELETE_ORDER':
             // 收到删除订单广播
+            state.deletedOrderIds = state.deletedOrderIds || [];
+            if (!state.deletedOrderIds.includes(msg.orderId)) {
+                state.deletedOrderIds.push(msg.orderId);
+                if (state.deletedOrderIds.length > 200) state.deletedOrderIds.shift();
+            }
             const delIdx = state.orders.findIndex(o => o.id === msg.orderId);
             if (delIdx !== -1) {
                 const order = state.orders.splice(delIdx, 1)[0];
@@ -1673,6 +1726,13 @@ window.confirmMergeOrder = function(sourceOrderId) {
         state.history.unshift(JSON.parse(JSON.stringify(sourceOrder)));
     }
     
+    // 记录到已删除/已合并黑名单，防止多端同步复活
+    state.deletedOrderIds = state.deletedOrderIds || [];
+    if (!state.deletedOrderIds.includes(sourceOrderId)) {
+        state.deletedOrderIds.push(sourceOrderId);
+        if (state.deletedOrderIds.length > 200) state.deletedOrderIds.shift();
+    }
+    
     // 5. 语音/音效播报
     speakText(`${sourceOrder.num}号订单已成功并入${targetOrder.num}号订单`);
     
@@ -1690,6 +1750,7 @@ window.confirmMergeOrder = function(sourceOrderId) {
         type: 'SYNC_STATE',
         orders: state.orders,
         history: state.history,
+        deletedOrderIds: state.deletedOrderIds,
         lastOrderNum: state.lastOrderNum,
         dishes: state.dishes,
         tags: state.tags
@@ -1951,6 +2012,13 @@ window.cancelOrder = function(orderId) {
     const order = state.orders.splice(orderIdx, 1)[0];
     order.status = 'deleted'; // 标记为已删除
     
+    // 记录到已删除/已合并黑名单，防止多端同步复活
+    state.deletedOrderIds = state.deletedOrderIds || [];
+    if (!state.deletedOrderIds.includes(orderId)) {
+        state.deletedOrderIds.push(orderId);
+        if (state.deletedOrderIds.length > 200) state.deletedOrderIds.shift();
+    }
+
     // 播放取消音效
     playCancelSound();
     
@@ -1967,6 +2035,16 @@ window.cancelOrder = function(orderId) {
         type: 'DELETE_ORDER',
         orderId: orderId
     });
+
+    broadcastMsg({
+        type: 'SYNC_STATE',
+        orders: state.orders,
+        history: state.history,
+        deletedOrderIds: state.deletedOrderIds,
+        lastOrderNum: state.lastOrderNum,
+        dishes: state.dishes,
+        tags: state.tags
+    }, true);
 };
 
 // --- 设置页面的具体逻辑操作 ---
