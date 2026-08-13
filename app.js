@@ -897,9 +897,8 @@ function renderGrillingList() {
             
         const footerHtml = isPaid
             ? `<div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0, 230, 118, 0.12); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(0, 230, 118, 0.3); width: 100%; gap: 6px;">
-                <span style="color: #00e676; font-weight: bold; font-size: 0.85rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">✅ 已付款</span>
-                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 4px 8px; font-size: 0.8rem; width: auto !important;">✏️ 改单</button>
-                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openMergeOrderModal('${order.id}', event)" style="padding: 4px 8px; font-size: 0.8rem; width: auto !important; color: #ffd600; border-color: rgba(255, 214, 0, 0.4); background: rgba(255, 214, 0, 0.12);" title="合并其他订单到此单">🔗 并单</button>
+                <span style="color: #00e676; font-weight: bold; font-size: 0.85rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">✅ 已付款 (加菜直接点改单)</span>
+                <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 4px 10px; font-size: 0.8rem; width: auto !important;">✏️ 改单</button>
                </div>`
             : `<div style="display: flex; align-items: center; gap: 6px; width: 100%;">
                 <button type="button" class="btn btn-secondary" onclick="event.stopPropagation(); window.openModifyOrderModal('${order.id}')" style="padding: 0 10px; height: 46px; font-size: 0.85rem; font-weight: bold; border-radius: 23px; flex-shrink: 0; width: auto !important; white-space: nowrap;" title="修改订单/加菜">✏️ 改单</button>
@@ -1606,6 +1605,12 @@ window.openMergeOrderModal = function(targetOrderId, event) {
     }
     const targetOrder = state.orders.find(o => o.id === targetOrderId);
     if (!targetOrder) return;
+    
+    if (targetOrder.isPaid) {
+        alert('该订单已经确认付款结账，无法再进行并单操作。\n如需加菜或加酒水，请点击【✏️ 改单】直接操作。');
+        return;
+    }
+
     currentMergeTargetId = targetOrderId;
     
     const titleEl = document.getElementById('merge-modal-title');
@@ -1623,20 +1628,20 @@ window.openMergeOrderModal = function(targetOrderId, event) {
             dishesSummary.push(`${name}×${qty}`);
         }
         targetSummaryEl.innerHTML = `
-            <div style="font-weight: bold; color: #ffd600; margin-bottom: 4px; font-size: 0.95rem;">📌 当前主订单：#${targetOrder.num}号 (${targetOrder.tableNum || '1号桌'}) · 当前总计 ￥${total.toFixed(2)}</div>
+            <div style="font-weight: bold; color: #ffd600; margin-bottom: 4px; font-size: 0.95rem;">📌 当前主订单：#${targetOrder.num}号 (${targetOrder.tableNum || '1号桌'}) · 当前总计 ￥${total.toFixed(2)} (未付款)</div>
             <div style="font-size: 0.82rem; color: #bbb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${dishesSummary.join('、') || '暂无菜品'}">已点明细：${dishesSummary.join('、') || '暂无菜品'}</div>
             ${targetOrder.customTag ? `<div style="font-size: 0.8rem; color: #ff9100; margin-top: 2px;">📌 原备注: ${targetOrder.customTag}</div>` : ''}
         `;
     }
     
-    // 渲染其他可合并订单列表
+    // 渲染其他可合并订单列表 (只展示未付款的单子，已付款的坚决不参与并单)
     const candidateListEl = document.getElementById('merge-candidate-list');
     if (candidateListEl) {
-        const otherOrders = state.orders.filter(o => o.id !== targetOrderId && o.status !== 'deleted');
+        const otherOrders = state.orders.filter(o => o.id !== targetOrderId && o.status !== 'deleted' && !o.isPaid);
         if (otherOrders.length === 0) {
             candidateListEl.innerHTML = `
                 <div style="text-align: center; color: var(--text-muted); padding: 35px 10px; font-size: 0.95rem;">
-                    🍢 目前没有其他正在烤的订单可合并
+                    🍢 目前没有其他未付款的正在烤订单可合并
                 </div>
             `;
         } else {
@@ -1656,8 +1661,7 @@ window.openMergeOrderModal = function(targetOrderId, event) {
                         <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
                             <span style="font-weight: bold; color: #ffffff; font-size: 0.95rem;">#${o.num}号单</span>
                             <span style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: #ffd600; font-weight: bold;">${o.tableNum || '1号桌'}</span>
-                            <span style="font-weight: bold; color: #00e676; font-size: 0.9rem;">￥${otherTotal.toFixed(2)}</span>
-                            ${o.isPaid ? '<span style="font-size: 0.7rem; color: #00e676; border: 1px solid #00e676; border-radius: 4px; padding: 1px 4px; font-weight: bold;">已付款</span>' : ''}
+                            <span style="font-weight: bold; color: #ffd600; font-size: 0.9rem;">￥${otherTotal.toFixed(2)}</span>
                         </div>
                         <div style="font-size: 0.8rem; color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${otherDishesSummary.join('、')}">
                             ${otherDishesSummary.join('、')}
@@ -1690,6 +1694,10 @@ window.confirmMergeOrder = function(sourceOrderId) {
     if (!targetOrder || sourceOrderIdx === -1) return;
     
     const sourceOrder = state.orders[sourceOrderIdx];
+    if (sourceOrder.isPaid || targetOrder.isPaid) {
+        alert('已付款订单无法进行合并。');
+        return;
+    }
     
     const isConfirmed = confirm(`确定将 #${sourceOrder.num}号单 (${sourceOrder.tableNum || '1号桌'}) 的菜品全部并入 #${targetOrder.num}号单 吗？\n合并后 #${sourceOrder.num}号单 将自动结转并入。`);
     if (!isConfirmed) return;
